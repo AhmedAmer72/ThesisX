@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useSignMessage } from "wagmi";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { fetchWithWallet } from "@/lib/wallet/api";
+import { signExecutionApproval } from "@/lib/wallet/approval-client";
 import { Button } from "@/components/ui/button";
 
 type RebalanceRun = {
@@ -20,13 +22,14 @@ export function RebalancePanel({
   slug: string;
   initialPending: RebalanceRun[];
 }) {
-  const { address, isConnected } = useWallet();
+  const { address, isConnected, isBackendLinked } = useWallet();
+  const { signMessageAsync } = useSignMessage();
   const [pending, setPending] = useState(initialPending);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function propose() {
-    if (!address) return;
+    if (!address || !isBackendLinked) return;
     setLoading(true);
     setMessage(null);
     try {
@@ -45,26 +48,41 @@ export function RebalancePanel({
     }
   }
 
-  async function act(
-    runId: string,
-    action: "approve" | "reject"
-  ) {
-    if (!address) return;
+  async function act(runId: string, action: "approve" | "reject") {
+    if (!address || !isBackendLinked) return;
     setLoading(true);
     setMessage(null);
     try {
+      let body: Record<string, unknown> = {
+        action,
+        rebalanceRunId: runId,
+        disclosureAccepted: action === "approve",
+      };
+      if (action === "approve") {
+        const approval = await signExecutionApproval(address, signMessageAsync, {
+          action: "rebalance_execute",
+          slug,
+          intentId: runId,
+        });
+        body = {
+          ...body,
+          intentId: runId,
+          approvalSignature: approval.approvalSignature,
+          approvalTimestamp: approval.approvalTimestamp,
+        };
+      }
       const res = await fetchWithWallet(`/api/funds/${slug}/rebalance`, address, {
         method: "POST",
-        body: JSON.stringify({
-          action,
-          rebalanceRunId: runId,
-          disclosureAccepted: action === "approve",
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setPending(pending.filter((p) => p.id !== runId));
-      setMessage(action === "approve" ? "Rebalance executed." : "Rebalance rejected.");
+      setMessage(
+        action === "approve"
+          ? "Rebalance signed and executed."
+          : "Rebalance rejected."
+      );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -78,15 +96,17 @@ export function RebalancePanel({
         <div>
           <h2 className="font-medium text-sm tracking-wide">Rebalance queue</h2>
           <p className="text-xs text-muted mt-0.5">
-            SoSo-powered proposals require your approval
+            SoSo-powered proposals require wallet-signed approval
           </p>
         </div>
-        {isConnected ? (
+        {isConnected && isBackendLinked ? (
           <Button onClick={propose} disabled={loading} size="sm">
             Propose rebalance
           </Button>
         ) : (
-          <span className="text-xs text-muted">Connect wallet to manage</span>
+          <span className="text-xs text-muted">
+            Connect wallet and complete sign-in
+          </span>
         )}
       </div>
       <div className="dashboard-panel-body">
@@ -124,14 +144,14 @@ export function RebalancePanel({
                       .map((a) => `${a.symbol} ${(a.weight * 100).toFixed(0)}%`)
                       .join(" · ")}
                   </p>
-                  {isConnected && (
+                  {isConnected && isBackendLinked && (
                     <div className="flex gap-2 mt-4">
                       <Button
                         size="sm"
                         onClick={() => act(run.id, "approve")}
                         disabled={loading}
                       >
-                        Approve
+                        Sign & Approve
                       </Button>
                       <Button
                         size="sm"
