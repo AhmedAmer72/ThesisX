@@ -17,6 +17,12 @@ import {
   type RiskLimits,
 } from "@/lib/risk/engine";
 import { extractSignalsFromPacket } from "@/lib/soso/signals";
+import { priceMapFromIntel } from "@/lib/portfolio/mark-to-market";
+import {
+  filterTradableAllocations,
+  isTradableSymbol,
+  isValidSymbolFormat,
+} from "@/lib/sodex/tradable";
 
 const PRIORITY_SYMBOLS = [
   "BTC",
@@ -26,8 +32,6 @@ const PRIORITY_SYMBOLS = [
   "TAO",
   "AKT",
   "AR",
-  "LINK",
-  "AVAX",
 ];
 
 const AGENTS = [
@@ -98,9 +102,15 @@ function pickAllocationUniverse(
 ): CommitteeResult["allocations"] {
   const infraSymbols = ["RNDR", "TAO", "AKT", "AR", "ETH", "SOL"];
   const hotSector = sectorFromFundraising(intel);
+  const prices = priceMapFromIntel(intel);
 
   const byScore = [...intel.currencies]
-    .filter((c) => c.symbol && c.symbol !== "???")
+    .filter(
+      (c) =>
+        c.symbol &&
+        isValidSymbolFormat(c.symbol) &&
+        isTradableSymbol(c.symbol, prices)
+    )
     .map((c) => ({ ...c, signalScore: scoreSymbolFromSignals(intel, c.symbol) }))
     .sort((a, b) => b.signalScore - a.signalScore);
 
@@ -278,6 +288,20 @@ function filterExcluded(
   return filtered.map((a) => ({ ...a, weight: a.weight / total }));
 }
 
+function finalizeAllocations(
+  allocations: CommitteeResult["allocations"],
+  intel: MarketIntelligencePacket,
+  limits: RiskLimits,
+  excluded: string[]
+): CommitteeResult["allocations"] {
+  const prices = priceMapFromIntel(intel);
+  const afterExclude = filterExcluded(
+    normalizeAllocations(allocations, limits),
+    excluded
+  );
+  return filterTradableAllocations(afterExclude, prices, limits);
+}
+
 function classifyAiFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
@@ -331,8 +355,10 @@ async function runDeterministicCommittee(
 }> {
   const result = buildDeterministicCommittee(prompt, intel, riskLevel);
   result.thesis.summary = `[SoSo deterministic committee · ${PROMPT_VERSION}] ${result.thesis.summary}`;
-  result.allocations = filterExcluded(
-    normalizeAllocations(result.allocations, limits),
+  result.allocations = finalizeAllocations(
+    result.allocations,
+    intel,
+    limits,
     excluded
   );
   const riskChecks = runRiskChecks(result.allocations, limits, excluded);
@@ -399,8 +425,10 @@ export async function runInvestmentCommittee(
       if (raw) {
         const parsed = CommitteeResultSchema.parse(JSON.parse(raw));
         parsed.riskLevel = riskLevel;
-        parsed.allocations = filterExcluded(
-          normalizeAllocations(parsed.allocations, limits),
+        parsed.allocations = finalizeAllocations(
+          parsed.allocations,
+          intel,
+          limits,
           excluded
         );
         const riskChecks = runRiskChecks(parsed.allocations, limits, excluded);

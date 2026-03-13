@@ -33,6 +33,13 @@ import {
 import { enqueueJob } from "@/lib/infra/queue";
 
 import { generateSosoAlerts } from "@/lib/alerts/service";
+import { FundSetupError } from "@/lib/fund/errors";
+import {
+  filterTradableAllocations,
+  listUnmappedAllocationSymbols,
+  listUnpricedAllocationSymbols,
+} from "@/lib/sodex/tradable";
+import type { MarketIntelligencePacket } from "@/lib/types";
 
 import type {
 
@@ -120,6 +127,53 @@ function assertExecutionProducedOrders(
   }
 }
 
+function assertTradableAllocations(
+  allocations: Allocation[],
+  intel: MarketIntelligencePacket,
+  limits: (typeof RISK_PRESETS)[RiskLevel]
+): Allocation[] {
+  const prices = priceMapFromIntel(intel);
+  const sanitized = filterTradableAllocations(allocations, prices, limits);
+  const nonStable = sanitized.filter(
+    (a) => !["USDC", "USDT", "DAI"].includes(a.symbol.toUpperCase())
+  );
+  if (nonStable.length === 0) {
+    const unmapped = listUnmappedAllocationSymbols(allocations);
+    const unpriced = listUnpricedAllocationSymbols(allocations, prices);
+    throw new FundSetupError(
+      "No tradable assets with live SoSo prices and SoDEX mappings. Check Settings → SoDEX setup.",
+      "no_tradable_assets",
+      {
+        unmapped,
+        unpriced,
+        tradableSymbols: Object.keys(prices).filter((s) => !["USDC", "USDT", "DAI"].includes(s)),
+      }
+    );
+  }
+  return sanitized;
+}
+
+async function resolveExecutionIntel(
+  storedJson?: string | null
+): Promise<MarketIntelligencePacket | null> {
+  if (isLiveIntelligenceRequired()) {
+    try {
+      return await sosoClient.buildIntelligencePacket({
+        liveOnly: true,
+        useCache: true,
+      });
+    } catch {
+      // fall through to stored intel
+    }
+  }
+  if (!storedJson) return null;
+  try {
+    return JSON.parse(storedJson) as MarketIntelligencePacket;
+  } catch {
+    return null;
+  }
+}
+
 
 
 export async function createFundFromPrompt(
@@ -156,9 +210,18 @@ export async function createFundFromPrompt(
       maxDrawdownPct: options.maxDrawdownPct,
     });
 
-
-
   const limits = RISK_PRESETS[riskLevel];
+  const sanitizedAllocations = assertTradableAllocations(
+    result.allocations,
+    intel,
+    limits
+  );
+  result.allocations = sanitizedAllocations;
+
+  const tradePlan = buildExecutionTradePlan(sanitizedAllocations, {
+    prices: priceMapFromIntel(intel),
+    useDelta: false,
+  });
 
   const maxDrawdown = options.maxDrawdownPct ?? limits.maxDrawdownPct;
 
@@ -172,13 +235,14 @@ export async function createFundFromPrompt(
 
   const slug = slugify(result.fundName);
 
+  const fundSlug = `${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-
-  const fund = await prisma.fund.create({
+  const txResult = await prisma.$transaction(async (tx) => {
+    const created = await tx.fund.create({
 
     data: {
 
-      slug: `${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      slug: fundSlug,
 
       name: result.fundName,
 
@@ -244,7 +308,7 @@ export async function createFundFromPrompt(
 
         create: {
 
-          allocationsJson: JSON.stringify(result.allocations),
+          allocationsJson: JSON.stringify(sanitizedAllocations),
 
           nav: 100000,
 
@@ -332,9 +396,33 @@ export async function createFundFromPrompt(
 
     },
 
+    });
+
+    const intent = await tx.tradeIntent.create({
+
+      data: {
+
+        fundId: created.id,
+
+        ordersJson: JSON.stringify(tradePlan),
+
+        status: approved ? "pending_review" : "blocked",
+
+        kind: "initial",
+
+        riskChecksJson: JSON.stringify(riskChecks),
+
+        approvedAt: null,
+
+      },
+
+    });
+
+    return { fund: created, intent };
   });
 
-
+  const fund = txResult.fund;
+  const intent = txResult.intent;
 
   logAiRun(fund.id, "committee_complete", {
 
@@ -345,33 +433,6 @@ export async function createFundFromPrompt(
     excludedCount: excluded.length,
 
     userId: options.userId,
-
-  });
-
-
-
-  const tradePlan = buildExecutionTradePlan(result.allocations, {
-    prices: priceMapFromIntel(intel),
-    useDelta: false,
-  });
-
-  const intent = await prisma.tradeIntent.create({
-
-    data: {
-
-      fundId: fund.id,
-
-      ordersJson: JSON.stringify(tradePlan),
-
-      status: approved ? "pending_review" : "blocked",
-
-      kind: "initial",
-
-      riskChecksJson: JSON.stringify(riskChecks),
-
-      approvedAt: null,
-
-    },
 
   });
 
@@ -499,17 +560,13 @@ export async function approveAndExecuteFund(
 
 
 
-  let intelPacket = null as ReturnType<typeof JSON.parse> | null;
-  if (fund.thesis?.intelPacketJson) {
-    try {
-      intelPacket = JSON.parse(fund.thesis.intelPacketJson);
-    } catch {
-      intelPacket = null;
-    }
-  }
-  const intel = intelPacket as import("@/lib/types").MarketIntelligencePacket | null;
+  const intel = await resolveExecutionIntel(fund.thesis?.intelPacketJson);
+  const limits = RISK_PRESETS[fund.riskLevel as RiskLevel];
+  const sanitizedAllocations = intel
+    ? assertTradableAllocations(allocations, intel, limits)
+    : allocations;
   const positions = await getFundPositions(fundId);
-  const tradePlan = buildExecutionTradePlan(allocations, {
+  const tradePlan = buildExecutionTradePlan(sanitizedAllocations, {
     prices: intel ? priceMapFromIntel(intel) : {},
     positions,
     useDelta: positions.length > 0,
@@ -733,9 +790,15 @@ export async function proposeRebalance(
 
   );
 
+  const limits = RISK_PRESETS[fund.riskLevel as RiskLevel];
+  const sanitizedAllocations = assertTradableAllocations(
+    result.allocations,
+    intel,
+    limits
+  );
+  result.allocations = sanitizedAllocations;
 
-
-  const tradePlan = buildExecutionTradePlan(result.allocations, {
+  const tradePlan = buildExecutionTradePlan(sanitizedAllocations, {
     prices: priceMapFromIntel(intel),
     useDelta: false,
   });
@@ -1002,18 +1065,15 @@ export async function approveRebalance(
 
   ) as Allocation[];
 
-  let rebalanceIntel = null as import("@/lib/types").MarketIntelligencePacket | null;
-  if (run.fund.thesis?.intelPacketJson) {
-    try {
-      rebalanceIntel = JSON.parse(
-        run.fund.thesis.intelPacketJson
-      ) as import("@/lib/types").MarketIntelligencePacket;
-    } catch {
-      rebalanceIntel = null;
-    }
-  }
+  const rebalanceIntel =
+    (await resolveExecutionIntel(run.intelPacketJson)) ??
+    (await resolveExecutionIntel(run.fund.thesis?.intelPacketJson));
+  const limits = RISK_PRESETS[run.fund.riskLevel as RiskLevel];
+  const sanitizedAllocations = rebalanceIntel
+    ? assertTradableAllocations(allocations, rebalanceIntel, limits)
+    : allocations;
   const positions = await getFundPositions(fundId);
-  const tradePlan = buildExecutionTradePlan(allocations, {
+  const tradePlan = buildExecutionTradePlan(sanitizedAllocations, {
     prices: rebalanceIntel ? priceMapFromIntel(rebalanceIntel) : {},
     positions,
     useDelta: positions.length > 0,
