@@ -10,8 +10,13 @@ export function isProductionMode(): boolean {
   );
 }
 
+/** OpenAI is required only when explicitly enabled via OPENAI_REQUIRED=true. */
 export function isAiRequired(): boolean {
-  return isProductionMode() && process.env.OPENAI_REQUIRED !== "false";
+  return isProductionMode() && process.env.OPENAI_REQUIRED === "true";
+}
+
+export function isAiEnhancementAvailable(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
 export function isDemoContentAllowed(): boolean {

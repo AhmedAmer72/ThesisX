@@ -118,23 +118,16 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-
       fundId: result.fund.id,
-
       slug: result.fund.slug,
-
       approved: result.approved,
-
       status: result.fund.status,
-
       requiresApproval: true,
-
       demoMode: result.intel.demoMode,
-
       userId: result.fund.userId,
-
+      committeeMode: result.committeeMeta.mode,
+      committeeFallbackReason: result.committeeMeta.fallbackReason,
       requestId: reqId,
-
     });
 
   } catch (e) {

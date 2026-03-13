@@ -75,6 +75,12 @@ function CreateFundContent() {
   const [executionMode, setExecutionMode] = useState("mock");
   const [moduleProgress, setModuleProgress] = useState<string[]>([]);
   const [buildathonMode, setBuildathonMode] = useState(false);
+  const [committeeMode, setCommitteeMode] = useState<
+    "openai" | "deterministic" | null
+  >(null);
+  const [committeeFallbackReason, setCommitteeFallbackReason] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     void fetch("/api/health")
@@ -113,11 +119,13 @@ function CreateFundContent() {
     }
     setPhase("generating");
     setSteps([
-      "Fetching SoSoValue intelligence...",
-      "Running AI investment committee...",
-      "Building portfolio & risk checks...",
+      "Fetching live SoSoValue intelligence...",
+      "Running SoSo deterministic committee...",
+      "Applying risk checks and allocations...",
       "Preparing execution plan (approval required)...",
     ]);
+    setCommitteeMode(null);
+    setCommitteeFallbackReason(null);
     setModuleProgress([]);
     void fetch("/api/intelligence/health?live=true")
       .then((r) => r.json())
@@ -147,6 +155,8 @@ function CreateFundContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
+      setCommitteeMode(data.committeeMode ?? null);
+      setCommitteeFallbackReason(data.committeeFallbackReason ?? null);
       await loadFund(data.slug);
       router.replace(`/create?slug=${data.slug}`);
     } catch (e) {
@@ -172,6 +182,14 @@ function CreateFundContent() {
   } catch {
     excludedList = [];
   }
+
+  const resolvedCommitteeMode =
+    committeeMode ??
+    (fund?.thesis?.summary?.includes("[SoSo deterministic committee")
+      ? "deterministic"
+      : fund
+        ? "openai"
+        : null);
 
   return (
     <div className="site-offset container max-w-4xl py-10 md:py-14 min-h-[60vh] bg-page-background">
@@ -338,6 +356,29 @@ function CreateFundContent() {
 
       {phase === "review" && fund && (
         <div className="mt-10 space-y-10">
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              resolvedCommitteeMode === "openai"
+                ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200"
+                : "border-amber-500/30 bg-amber-950/20 text-amber-100"
+            }`}
+          >
+            {resolvedCommitteeMode === "openai" ? (
+              <p>
+                Generated with live SoSoValue data and OpenAI committee
+                enhancement.
+              </p>
+            ) : (
+              <p>
+                Generated with live SoSoValue data using the deterministic SoSo
+                committee
+                {committeeFallbackReason
+                  ? ` (AI enhancement unavailable: ${committeeFallbackReason.replaceAll("_", " ")})`
+                  : ""}
+                .
+              </p>
+            )}
+          </div>
           <div>
             <h2 className="text-2xl font-semibold">{fund.name}</h2>
             <p className="text-muted text-sm mt-1">{fund.strategyType}</p>

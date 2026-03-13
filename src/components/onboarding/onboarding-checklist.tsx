@@ -15,7 +15,11 @@ const steps = [
   { key: "wallet", label: "Connect wallet", href: "/dashboard" },
   { key: "soso", label: "Configure SoSoValue API", href: "/settings" },
   { key: "sodex", label: "Configure SoDEX testnet", href: "/settings" },
-  { key: "openai", label: "Configure OpenAI committee", href: "/settings" },
+  {
+    key: "openai",
+    label: "Configure OpenAI enhancement (optional)",
+    href: "/settings",
+  },
   { key: "create", label: "Create your first fund", href: "/create" },
 ] as const;
 
