@@ -1,13 +1,12 @@
 import { prisma } from "@/lib/db";
 import { logExecution } from "@/lib/observability";
 import { fetchOrderStatus, mapRemoteStatusToLocal } from "@/lib/sodex/order-status";
-import { priceMapFromIntel } from "@/lib/portfolio/mark-to-market";
 import {
   applyFillToPositions,
   getFundPositions,
   snapshotFundNav,
 } from "@/lib/portfolio/positions";
-import type { Allocation, MarketIntelligencePacket } from "@/lib/types";
+import type { MarketIntelligencePacket } from "@/lib/types";
 import { getExecutionMode } from "@/lib/buildathon";
 
 export type ReconciliationResult = {
@@ -57,7 +56,7 @@ export async function reconcileFundExecution(
       order.status === "submitted" ||
       order.status === "filled_simulated"
     ) {
-      let nextStatus = order.status;
+      let nextStatus: string = order.status;
 
       if (mode !== "mock" && order.externalRef && !order.externalRef.startsWith("mock-")) {
         const remote = await fetchOrderStatus(order.externalRef);
@@ -73,23 +72,16 @@ export async function reconcileFundExecution(
       }
 
       if (nextStatus !== order.status) {
+        const persistedStatus =
+          nextStatus === "filled" ? "reconciled" : nextStatus;
         await prisma.executionOrder.update({
           where: { id: order.id },
-          data: { status: nextStatus },
-        });
-        updated += 1;
-      } else if (nextStatus === "filled" || nextStatus === "reconciled") {
-        await prisma.executionOrder.update({
-          where: { id: order.id },
-          data: { status: "reconciled" },
+          data: { status: persistedStatus },
         });
         updated += 1;
       }
 
-      if (
-        ["filled", "reconciled"].includes(nextStatus) &&
-        order.status !== "reconciled"
-      ) {
+      if (["filled", "reconciled"].includes(nextStatus)) {
         const px =
           packet?.currencies.find(
             (c) => c.symbol.toUpperCase() === order.symbol.toUpperCase()

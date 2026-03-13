@@ -9,7 +9,11 @@ export function WhyPortfolioPanel({
 }: {
   prompt?: string;
   intel: MarketIntelligencePacket | null;
-  committee?: Pick<CommitteeResult, "thesis" | "agentVotes" | "confidence"> | null;
+  committee?: {
+    thesis?: CommitteeResult["thesis"];
+    agentVotes: CommitteeResult["agentVotes"];
+    confidence: CommitteeResult["confidence"];
+  } | null;
   allocations: Allocation[];
 }) {
   return (
