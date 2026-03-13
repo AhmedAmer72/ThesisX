@@ -308,7 +308,9 @@ export async function runInvestmentCommittee(
   }
 
   if (isAiRequired()) {
-    throw new Error("OpenAI committee required but unavailable");
+    throw new Error(
+      "OpenAI committee required but unavailable. Add OPENAI_API_KEY to your Vercel environment variables."
+    );
   }
 
   const result = buildDeterministicCommittee(prompt, intel, riskLevel);
