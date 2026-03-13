@@ -51,6 +51,13 @@ export function SosoHealthPanel() {
       <h2 className="font-semibold">SoSoValue modules</h2>
       <p className="text-sm text-muted mt-2">
         API key: {health.configured ? "configured" : "missing — live features disabled"}
+        {health.modules.length > 0 && (
+          <>
+            {" "}
+            · {health.modules.filter((m) => m.status !== "error").length}/
+            {health.modules.length} modules ok
+          </>
+        )}
       </p>
       <ul className="mt-4 space-y-2 text-sm">
         {health.modules.map((m) => (

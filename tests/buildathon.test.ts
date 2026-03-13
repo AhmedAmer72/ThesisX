@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import {
   getExecutionMode,
+  getMinSosoModulesRequired,
   isBuildathonMode,
   isDemoPacketAllowed,
   isMockExecutionAllowed,
 } from "@/lib/buildathon";
+import { CORE_MODULES, FULL_MODULE_COUNT } from "@/lib/soso/endpoints";
 import { requireSymbolId, getSymbolId } from "@/lib/sodex/symbols";
 import { extractSignalsFromPacket } from "@/lib/soso/signals";
 import { getDemoIntelligencePacket } from "@/lib/soso/demo-data";
@@ -27,6 +29,13 @@ describe("buildathon mode", () => {
     expect(getExecutionMode()).toBe("testnet");
     expect(isMockExecutionAllowed()).toBe(false);
     expect(isDemoPacketAllowed()).toBe(false);
+    expect(getMinSosoModulesRequired()).toBeGreaterThanOrEqual(6);
+  });
+
+  it("includes all nine core modules for fund create", () => {
+    expect(FULL_MODULE_COUNT).toBe(9);
+    expect(CORE_MODULES).toContain("charts");
+    expect(CORE_MODULES).toContain("etf");
   });
 
   it("blocks unmapped symbols", () => {

@@ -427,6 +427,7 @@ function CreateFundContent() {
             let sources: IntelligenceSource[] = [];
             let moduleHealth: IntelligenceModuleHealth[] | undefined;
             let demoMode = true;
+            let intelPacket: MarketIntelligencePacket | null = null;
             try {
               sources = JSON.parse(
                 fund.thesis?.sourcesJson ?? "[]"
@@ -439,6 +440,7 @@ function CreateFundContent() {
                 const pkt = JSON.parse(
                   fund.thesis.intelPacketJson
                 ) as MarketIntelligencePacket;
+                intelPacket = pkt;
                 moduleHealth = pkt.moduleHealth;
                 demoMode = pkt.demoMode;
               } catch {
@@ -451,6 +453,7 @@ function CreateFundContent() {
               <IntelSourcesPanel
                 sources={sources}
                 moduleHealth={moduleHealth}
+                intel={intelPacket}
                 intelFetchedAt={fund.thesis?.intelFetchedAt ?? undefined}
                 demoMode={demoMode}
               />

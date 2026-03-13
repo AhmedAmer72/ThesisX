@@ -8,6 +8,7 @@ import { SodexSetupWizard } from "@/components/settings/sodex-setup-wizard";
 import { WalletConnectButton } from "@/components/wallet/wallet-connect-button";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { shortenAddress } from "@/lib/wallet/utils";
+import { fetchWithWallet } from "@/lib/wallet/api";
 
 type Health = {
   db: boolean;
@@ -54,9 +55,8 @@ export function SettingsPanel() {
 
   async function toggleGlobalKill() {
     setMessage(null);
-    const res = await fetch("/api/settings/kill-switch", {
+    const res = await fetchWithWallet("/api/settings/kill-switch", address, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !globalKill }),
     });
     const data = await res.json();
@@ -74,9 +74,8 @@ export function SettingsPanel() {
       return;
     }
     setMessage(null);
-    const res = await fetch("/api/settings/fund-kill-switch", {
+    const res = await fetchWithWallet("/api/settings/fund-kill-switch", address, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: fundSlug.trim(), active: fundKill }),
     });
     const data = await res.json();

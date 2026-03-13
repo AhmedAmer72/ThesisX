@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       userId: auth.userId,
       address,
       label: body.label ?? null,
-      chainId: Number(body.chainId ?? 1),
+      chainId: Number(body.chainId ?? 138565),
     },
     update: { label: body.label ?? null },
   });
