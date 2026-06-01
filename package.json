@@ -1,0 +1,59 @@
+{
+  "name": "thesisx",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "verify:soso": "node scripts/verify-soso-live.mjs",
+    "validate:env": "node scripts/validate-env.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "clean:cache": "npm cache clean --force",
+    "clean:space": "npm run clean && npm run clean:cache",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@tanstack/react-query": "^5.101.0",
+    "@walletconnect/ethereum-provider": "^2.23.9",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.16.0",
+    "lucide-react": "^0.513.0",
+    "next": "^15.3.3",
+    "openai": "^4.104.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "^2.15.4",
+    "tailwind-merge": "^3.3.0",
+    "viem": "^2.31.0",
+    "wagmi": "^2.19.5",
+    "zod": "^3.25.56"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "@react-native-async-storage/async-storage": "npm:empty-module@0.0.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/node": "^22.15.29",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "eslint": "^9.28.0",
+    "eslint-config-next": "^15.3.3",
+    "prisma": "^6.9.0",
+    "tailwindcss": "^4.1.8",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  }
+}
