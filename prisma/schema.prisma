@@ -1,0 +1,755 @@
+generator client {
+
+  provider = "prisma-client-js"
+
+}
+
+
+
+datasource db {
+
+  provider = "postgresql"
+
+  url      = env("DATABASE_URL")
+
+}
+
+
+
+model User {
+
+  id                String   @id @default(cuid())
+
+  email             String?  @unique
+
+  walletAddress     String?  @unique
+
+  plan              String   @default("free")
+
+  featureFlagsJson  String   @default("[]")
+
+  createdAt         DateTime @default(now())
+
+  updatedAt         DateTime @updatedAt
+
+  funds             Fund[]
+
+  fundFollows       FundFollow[]
+
+  copyIntents       CopyIntent[]
+
+  notifications     Notification[]
+
+  walletWatches     WalletWatch[]
+
+  usageEvents       UsageEvent[]
+
+}
+
+
+
+model Fund {
+
+  id               String   @id @default(cuid())
+
+  slug             String   @unique
+
+  name             String
+
+  prompt           String
+
+  strategyType     String
+
+  riskLevel        String
+
+  rebalanceCadence String
+
+  status           String   @default("draft")
+
+  isPublic         Boolean  @default(true)
+
+  isSeeded         Boolean  @default(false)
+
+  userId           String?
+
+  user             User?    @relation(fields: [userId], references: [id])
+
+  createdAt        DateTime @default(now())
+
+  updatedAt        DateTime @updatedAt
+
+
+
+  thesis             FundThesis?
+
+  riskPolicy         RiskPolicy?
+
+  portfolioSnapshots PortfolioSnapshot[]
+
+  agentVotes         AgentVote[]
+
+  tradeIntents       TradeIntent[]
+
+  executionOrders    ExecutionOrder[]
+
+  reasoningLogs      ReasoningLog[]
+
+  performancePoints  PerformancePoint[]
+
+  fundFollows        FundFollow[]
+
+  rebalanceRuns      RebalanceRun[]
+
+  fundReports        FundReport[]
+
+  notifications      Notification[]
+
+  positions          Position[]
+
+  alerts             Alert[]
+
+  aiRuns             AiRun[]
+
+}
+
+
+
+model FundThesis {
+
+  id              String    @id @default(cuid())
+
+  fundId          String    @unique
+
+  fund            Fund      @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  summary         String
+
+  outlook         String
+
+  narratives      String
+
+  constraints     String
+
+  sourcesJson     String
+
+  intelPacketJson String?
+
+  intelFetchedAt  DateTime?
+
+  confidence      Float
+
+  createdAt       DateTime  @default(now())
+
+  updatedAt       DateTime  @updatedAt
+
+}
+
+
+
+model RiskPolicy {
+
+  id                 String  @id @default(cuid())
+
+  fundId             String  @unique
+
+  fund               Fund    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  maxDrawdownPct     Float
+
+  maxPositionPct     Float
+
+  maxSectorPct       Float
+
+  maxAssets          Int
+
+  excludedAssetsJson String  @default("[]")
+
+  killSwitch         Boolean @default(false)
+
+}
+
+
+
+model PortfolioSnapshot {
+
+  id              String   @id @default(cuid())
+
+  fundId          String
+
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  allocationsJson String
+
+  nav             Float    @default(100000)
+
+  confidence      Float
+
+  rebalanceReason String?
+
+  createdAt       DateTime @default(now())
+
+}
+
+
+
+model AgentVote {
+
+  id          String   @id @default(cuid())
+
+  fundId      String
+
+  fund        Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  agentName   String
+
+  stance      String
+
+  confidence  Float
+
+  rationale   String
+
+  sourcesJson String   @default("[]")
+
+  createdAt   DateTime @default(now())
+
+}
+
+
+
+model TradeIntent {
+
+  id             String    @id @default(cuid())
+
+  fundId         String
+
+  fund           Fund      @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  ordersJson     String
+
+  status         String    @default("pending_review")
+
+  kind           String    @default("initial")
+
+  riskChecksJson String    @default("[]")
+
+  approvedAt     DateTime?
+
+  executedAt     DateTime?
+
+  createdAt      DateTime  @default(now())
+
+  rebalanceRun   RebalanceRun?
+
+}
+
+
+
+model RebalanceRun {
+
+  id                      String    @id @default(cuid())
+
+  fundId                  String
+
+  fund                    Fund      @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  tradeIntentId           String?   @unique
+
+  tradeIntent             TradeIntent? @relation(fields: [tradeIntentId], references: [id])
+
+  previousAllocationsJson String
+
+  proposedAllocationsJson String
+
+  intelPacketJson         String?
+
+  agentVotesJson          String    @default("[]")
+
+  status                  String    @default("pending_review")
+
+  triggeredBy             String    @default("manual")
+
+  createdAt               DateTime  @default(now())
+
+  executedAt              DateTime?
+
+}
+
+
+
+model ExecutionOrder {
+
+  id          String   @id @default(cuid())
+
+  fundId      String
+
+  fund        Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  symbol      String
+
+  side        String
+
+  quantity    String
+
+  status      String
+
+  mode        String
+
+  externalRef String?
+
+  nonce       String?
+
+  createdAt   DateTime @default(now())
+
+  updatedAt   DateTime @updatedAt
+
+}
+
+
+
+model ReasoningLog {
+
+  id           String   @id @default(cuid())
+
+  fundId       String
+
+  fund         Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type         String
+
+  title        String
+
+  body         String
+
+  metadataJson String   @default("{}")
+
+  createdAt    DateTime @default(now())
+
+}
+
+
+
+model PerformancePoint {
+
+  id          String   @id @default(cuid())
+
+  fundId      String
+
+  fund        Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  nav         Float
+
+  pnlPct      Float
+
+  drawdownPct Float    @default(0)
+
+  createdAt   DateTime @default(now())
+
+}
+
+
+
+model FundFollow {
+
+  id             String   @id @default(cuid())
+
+  userId         String
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fundId         String
+
+  fund           Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  allocationPct  Float    @default(100)
+
+  status         String   @default("active")
+
+  createdAt      DateTime @default(now())
+
+  updatedAt      DateTime @updatedAt
+
+  snapshots      FollowerSnapshot[]
+
+
+
+  @@unique([userId, fundId])
+
+}
+
+
+
+model FollowerSnapshot {
+
+  id                   String     @id @default(cuid())
+
+  followId             String
+
+  follow               FundFollow @relation(fields: [followId], references: [id], onDelete: Cascade)
+
+  allocationsJson      String
+
+  nav                  Float      @default(10000)
+
+  triggeredBy          String
+
+  sourceFundSnapshotId String?
+
+  createdAt            DateTime   @default(now())
+
+}
+
+
+
+model CopyIntent {
+
+  id             String   @id @default(cuid())
+
+  userId         String
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fundId         String
+
+  action         String
+
+  allocationPct  Float?
+
+  status         String   @default("completed")
+
+  metadataJson   String   @default("{}")
+
+  createdAt      DateTime @default(now())
+
+}
+
+
+
+model FundReport {
+
+  id          String   @id @default(cuid())
+
+  fundId      String
+
+  fund        Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  period      String
+
+  contentJson String
+
+  generatedAt DateTime @default(now())
+
+}
+
+
+
+model Notification {
+
+  id           String   @id @default(cuid())
+
+  userId       String?
+
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fundId       String?
+
+  fund         Fund?    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type         String
+
+  title        String
+
+  body         String
+
+  read         Boolean  @default(false)
+
+  metadataJson String   @default("{}")
+
+  createdAt    DateTime @default(now())
+
+}
+
+
+
+model IntelligenceCache {
+
+  id        String   @id @default(cuid())
+
+  module    String
+
+  key       String
+
+  payload   String
+
+  fetchedAt DateTime @default(now())
+
+
+
+  @@unique([module, key])
+
+}
+
+
+
+model ExecutionNonce {
+
+  id        String   @id @default(cuid())
+
+  signerKey String   @unique
+
+  lastNonce BigInt   @default(0)
+
+  updatedAt DateTime @updatedAt
+
+}
+
+
+
+model AuditLog {
+
+  id           String   @id @default(cuid())
+
+  level        String
+
+  category     String
+
+  message      String
+
+  requestId    String?
+
+  fundId       String?
+
+  metadataJson String   @default("{}")
+
+  createdAt    DateTime @default(now())
+
+}
+
+
+
+model AppSetting {
+
+  key       String   @id
+
+  value     String
+
+  updatedAt DateTime @updatedAt
+
+}
+
+
+
+model Position {
+
+  id            String   @id @default(cuid())
+
+  fundId        String
+
+  fund          Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  symbol        String
+
+  quantity      Float    @default(0)
+
+  avgCostUsd    Float    @default(0)
+
+  lastPriceUsd  Float?
+
+  marketValueUsd Float   @default(0)
+
+  unrealizedPnl Float    @default(0)
+
+  updatedAt     DateTime @updatedAt
+
+  createdAt     DateTime @default(now())
+
+
+
+  @@unique([fundId, symbol])
+
+  @@index([fundId])
+
+}
+
+
+
+model JobQueue {
+
+  id              String    @id @default(cuid())
+
+  type            String
+
+  fundId          String?
+
+  status          String    @default("pending")
+
+  payloadJson     String    @default("{}")
+
+  idempotencyKey  String?
+
+  runAt           DateTime  @default(now())
+
+  startedAt       DateTime?
+
+  completedAt     DateTime?
+
+  lastError       String?
+
+  createdAt       DateTime  @default(now())
+
+
+
+  @@index([status, runAt])
+
+  @@index([idempotencyKey])
+
+}
+
+
+
+model AiRun {
+
+  id              String   @id @default(cuid())
+
+  fundId          String?
+
+  fund            Fund?    @relation(fields: [fundId], references: [id], onDelete: SetNull)
+
+  userId          String?
+
+  agentName       String
+
+  promptVersion   String   @default("v1")
+
+  model           String?
+
+  inputJson       String   @default("{}")
+
+  outputJson      String   @default("{}")
+
+  citationsJson   String   @default("[]")
+
+  confidence      Float?
+
+  status          String   @default("completed")
+
+  createdAt       DateTime @default(now())
+
+
+
+  @@index([fundId])
+
+  @@index([agentName])
+
+}
+
+
+
+model Alert {
+
+  id           String   @id @default(cuid())
+
+  userId       String?
+
+  fundId       String?
+
+  fund         Fund?    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type         String
+
+  severity     String   @default("info")
+
+  title        String
+
+  body         String
+
+  metadataJson String   @default("{}")
+
+  read         Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+
+
+
+  @@index([userId, read])
+
+  @@index([fundId])
+
+}
+
+
+
+model WalletWatch {
+
+  id            String   @id @default(cuid())
+
+  userId        String
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  address       String
+
+  label         String?
+
+  chainId       Int      @default(1)
+
+  metadataJson  String   @default("{}")
+
+  createdAt     DateTime @default(now())
+
+
+
+  @@unique([userId, address])
+
+  @@index([address])
+
+}
+
+
+
+model UsageEvent {
+
+  id         String   @id @default(cuid())
+
+  userId     String?
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  event      String
+
+  quantity   Int      @default(1)
+
+  metadataJson String @default("{}")
+
+  createdAt  DateTime @default(now())
+
+
+
+  @@index([userId, event])
+
+  @@index([createdAt])
+
+}
+
+
+
+model AuthNonce {
+
+  id        String   @id @default(cuid())
+
+  address   String
+
+  nonce     String
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+
+
+  @@unique([address, nonce])
+
+  @@index([expiresAt])
+
+}
+
+
