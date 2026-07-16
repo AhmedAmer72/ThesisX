@@ -49,7 +49,7 @@ Full judge checklist: [docs/buildathon-demo.md](docs/buildathon-demo.md).
 3. **Create** → connect wallet → pick preset → review SoSo signal-to-allocation map.
 4. Approve execution → verify SoDEX order references (not `mock-*`).
 5. **Dashboard** → approve pending execution if needed → refresh intelligence → propose/approve rebalance.
-6. **Marketplace** → open public fund → mirror watchlist.
+6. **Marketplace** → open public fund → **Open paper mirror** → paper NAV / allocations / timeline on `/dashboard/following/[slug]`.
 7. **Docs** → `#buildathon-demo` for architecture and API proof.
 
 ## Environment
@@ -64,7 +64,7 @@ Full judge checklist: [docs/buildathon-demo.md](docs/buildathon-demo.md).
 | `SODEX_*` | SoDEX testnet credentials (`SODEX_ACCOUNT_ID` often `0`) |
 | `SOSO_MIN_MODULES_OK` | Minimum live SoSo modules before fund create (default 6) |
 | `WALLET_SESSION_SECRET` | Signed wallet session tokens |
-| `CRON_SECRET` | Protects `/api/rebalance/run` |
+| `CRON_SECRET` | Protects `/api/cron/tick` and `/api/rebalance/run` (Vercel Cron) |
 | `DATABASE_URL` | SQLite `file:./prisma/dev.db` |
 
 See [docs/api-validation.md](docs/api-validation.md) and [.env.example](.env.example).

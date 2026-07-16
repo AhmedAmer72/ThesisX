@@ -118,23 +118,29 @@ export const docSections: DocSection[] = [
   },
   {
     id: "copy-trading",
-    title: "Paper copy-trading",
+    title: "Paper strategy mirror",
     paragraphs: [
-      "Follow any public fund from the marketplace or fund page. ThesisX mirrors allocations into a paper follower portfolio — no on-chain deposits in MVP.",
+      "Follow any public fund from the marketplace or fund page. ThesisX opens a paper book that mirrors leader allocations at your chosen scale — no capital at risk, no automatic SoDEX orders for followers.",
     ],
     bullets: [
-      "POST /api/copy — follow, unfollow, allocation percentage",
-      "FollowerSnapshot records created on fund execution and rebalance fanout",
-      "View follows on /dashboard under Following (paper)",
+      "POST /api/copy — follow, unfollow, allocation percentage (returns portfolioPath)",
+      "GET /api/copy/portfolios — list paper books for the connected wallet",
+      "GET /api/copy/portfolios/[slug] — paper NAV, PnL, vs-leader, allocation + sync timeline",
+      "FollowerSnapshot + CopyIntent written on follow and on leader execution/rebalance fanout",
+      "Dashboard → Paper strategy mirrors → /dashboard/following/[slug]",
     ],
   },
   {
     id: "reports",
     title: "Reports & alerts",
     bullets: [
-      "Weekly memos: GET /api/reports/weekly?slug=... — persisted as FundReport",
-      "Alerts: ETF outflows, macro events, index drawdowns, BTC treasury activity, fundraising surges",
-      "Notifications appear on /dashboard; PATCH /api/notifications to mark read",
+      "Weekly memos: GET /api/reports/weekly?slug=... — persisted as FundReport; archive + copy/share on fund dashboard",
+      "Alerts: ETF outflows, macro, index drawdowns, BTC treasury, fundraising, risk-on/off (6h dedupe)",
+      "Notifications on /dashboard; PATCH /api/notifications (id or markAllRead)",
+      "Autonomous cron: GET /api/cron/tick (hourly) enqueues intel/alerts/weekly/committee/reconcile jobs",
+      "Live desk: GET /api/stream?channel=market-pulse (SSE) powers Market Pulse",
+      "Order tape: GET /api/stream?channel=fund:{id} + GET /api/funds/[slug]/orders?refresh=true",
+      "Wallet watchlists: GET/POST/DELETE /api/wallets/watch (Settings + Dashboard)",
     ],
   },
   {

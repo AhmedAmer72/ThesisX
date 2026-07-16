@@ -31,10 +31,15 @@ export default async function MarketplacePage() {
     include: {
       thesis: true,
       performancePoints: { orderBy: { createdAt: "desc" }, take: 8 },
+      fundFollows: {
+        where: { status: "active" },
+        select: { id: true },
+      },
     },
   });
 
   const items: MarketplaceFund[] = funds.map((f) => {
+    const followerCount = f.fundFollows.length;
     let sources: { module?: string }[] = [];
     try {
       sources = JSON.parse(f.thesis?.sourcesJson ?? "[]") as {
@@ -73,6 +78,7 @@ export default async function MarketplacePage() {
           dataFreshness,
           narratives,
           sosoModules,
+          followerCount,
         };
       } catch {
         /* fall through */
@@ -101,6 +107,7 @@ export default async function MarketplacePage() {
       dataFreshness,
       narratives,
       sosoModules,
+      followerCount,
     };
   });
 
@@ -111,8 +118,9 @@ export default async function MarketplacePage() {
         AI Fund Marketplace
       </h1>
       <p className="text-muted mt-2 max-w-xl text-[15px]">
-        Explore, compare, and follow autonomous AI-managed funds. Filter by
-        risk, strategy, returns, and data freshness.
+        Explore public AI funds and open a paper strategy mirror — track NAV and
+        allocations with no capital at risk. Syncs when the leader executes or
+        rebalances.
       </p>
 
       {items.length === 0 ? (

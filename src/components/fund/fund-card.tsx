@@ -11,6 +11,7 @@ export interface FundCardData {
   dataFreshness?: "live" | "demo";
   status?: string;
   sosoModules?: string[];
+  followerCount?: number;
 }
 
 export function FundCard({ fund }: { fund: FundCardData }) {
@@ -68,6 +69,12 @@ export function FundCard({ fund }: { fund: FundCardData }) {
             SoSo: {m}
           </span>
         ))}
+        {typeof fund.followerCount === "number" && (
+          <span className="rounded-full border border-border bg-elevated px-2 py-0.5">
+            {fund.followerCount} paper mirror
+            {fund.followerCount === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
       {fund.thesisSnippet && (
         <p className="text-sm text-muted mt-4 line-clamp-2">{fund.thesisSnippet}</p>

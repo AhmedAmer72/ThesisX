@@ -21,9 +21,11 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     return (
       pathname === "/create" ||
       pathname.startsWith("/create/") ||
-      pathname.startsWith("/funds/") ||
-      pathname.startsWith("/dashboard")
+      pathname.startsWith("/funds/")
     );
+  }
+  if (href === "/dashboard") {
+    return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   }
   if (href === "/marketplace") {
     return pathname === "/marketplace" || pathname.startsWith("/marketplace/");

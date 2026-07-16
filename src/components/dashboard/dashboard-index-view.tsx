@@ -10,6 +10,7 @@ import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
+import { WalletWatchPanel } from "@/components/settings/wallet-watch-panel";
 import { cn } from "@/lib/utils";
 
 type FundRow = {
@@ -30,6 +31,22 @@ type DashboardData = {
   follows: {
     fund: { slug: string; name: string; status: string };
     allocationPct: number;
+    paperNav?: number;
+    pnlPct?: number;
+    vsLeaderPct?: number | null;
+    lastSyncedAt?: string | null;
+    lastTriggeredBy?: string | null;
+  }[];
+  paperPortfolios?: {
+    fundSlug: string;
+    fundName: string;
+    fundStatus: string;
+    allocationPct: number;
+    paperNav: number;
+    pnlPct: number;
+    vsLeaderPct: number | null;
+    lastSyncedAt: string | null;
+    lastTriggeredBy: string | null;
   }[];
   pendingRebalances: {
     id: string;
@@ -43,6 +60,7 @@ type DashboardData = {
     read: boolean;
     createdAt: string;
     type?: string;
+    fund?: { slug: string; name: string } | null;
   }[];
   recentActions: {
     title: string;
@@ -132,6 +150,25 @@ export function DashboardIndexView() {
             notifications: prev.notifications.map((n) =>
               n.id === id ? { ...n, read: true } : n
             ),
+          }
+        : prev
+    );
+  }
+
+  async function markAllAlertsRead() {
+    if (!address) return;
+    await fetchWithWallet("/api/notifications", address, {
+      method: "PATCH",
+      body: JSON.stringify({ markAllRead: true }),
+    });
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            notifications: prev.notifications.map((n) => ({
+              ...n,
+              read: true,
+            })),
           }
         : prev
     );
@@ -325,7 +362,7 @@ export function DashboardIndexView() {
               </DashboardPanel>
 
               <DashboardPanel
-                title="Following (paper)"
+                title="Paper strategy mirrors"
                 count={data.follows.length}
                 action={
                   <Link
@@ -338,31 +375,69 @@ export function DashboardIndexView() {
               >
                 {data.follows.length === 0 ? (
                   <DashboardEmptyState
-                    title="No follows yet"
-                    description="Mirror public fund allocations in a paper portfolio — no capital at risk."
+                    title="No mirrors yet"
+                    description="Follow a public fund to open a paper book with NAV, allocations, and sync history — no capital at risk."
                     primaryHref="/marketplace"
                     primaryLabel="Find funds to follow"
                   />
                 ) : (
                   <ul className="space-y-1 -mx-1">
-                    {data.follows.map((fo, i) => (
-                      <li key={i}>
-                        <Link
-                          href={`/funds/${fo.fund.slug}`}
-                          className="dashboard-row block"
-                        >
-                          <div>
-                            <p className="font-medium">{fo.fund.name}</p>
-                            <span className={statusBadge(fo.fund.status)}>
-                              {fo.fund.status}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted shrink-0">
-                            {fo.allocationPct}% mirror
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
+                    {data.follows.map((fo, i) => {
+                      const pnl = fo.pnlPct ?? 0;
+                      const pnlClass =
+                        pnl > 0
+                          ? "text-emerald-400"
+                          : pnl < 0
+                            ? "text-red-400"
+                            : "text-muted";
+                      return (
+                        <li key={i}>
+                          <Link
+                            href={`/dashboard/following/${fo.fund.slug}`}
+                            className="dashboard-row block"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">
+                                {fo.fund.name}
+                              </p>
+                              <p className="text-xs text-muted mt-1">
+                                {fo.allocationPct}% scale
+                                {fo.lastTriggeredBy
+                                  ? ` · last ${fo.lastTriggeredBy}`
+                                  : ""}
+                                {fo.lastSyncedAt
+                                  ? ` · ${new Date(
+                                      fo.lastSyncedAt
+                                    ).toLocaleDateString()}`
+                                  : ""}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {fo.paperNav != null && (
+                                <p className="text-sm font-medium">
+                                  $
+                                  {fo.paperNav.toLocaleString(undefined, {
+                                    maximumFractionDigits: 0,
+                                  })}
+                                </p>
+                              )}
+                              <p className={cn("text-xs", pnlClass)}>
+                                {pnl > 0 ? "+" : ""}
+                                {pnl.toFixed(2)}%
+                                {fo.vsLeaderPct != null && (
+                                  <span className="text-muted">
+                                    {" "}
+                                    · vs leader{" "}
+                                    {fo.vsLeaderPct > 0 ? "+" : ""}
+                                    {fo.vsLeaderPct.toFixed(1)}%
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </Link>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </DashboardPanel>
@@ -401,41 +476,77 @@ export function DashboardIndexView() {
               </DashboardPanel>
 
               <DashboardPanel
-                title="Alerts"
+                title="SoSo alerts"
                 count={stats.alerts}
+                action={
+                  stats.alerts > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void markAllAlertsRead()}
+                      className="text-xs text-muted hover:text-foreground"
+                    >
+                      Mark all read
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-muted">Hourly cron</span>
+                  )
+                }
               >
                 {data.notifications.length === 0 ? (
                   <DashboardEmptyState
                     title="No alerts yet"
-                    description="ETF flows, macro events, index moves, and rebalance notices land here."
+                    description="Scheduled SoSo scans surface ETF outflows, macro events, risk-on shifts, and more — no spam (6h dedupe)."
                   />
                 ) : (
                   <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
                     {data.notifications.map((n) => (
                       <li key={n.id}>
-                        <button
-                          type="button"
-                          onClick={() => void markRead(n.id)}
+                        <div
                           className={cn(
-                            "w-full text-left rounded-xl border p-3 transition-colors",
+                            "rounded-xl border p-3 transition-colors",
                             n.read
                               ? "border-border/60 opacity-70"
-                              : "border-amber-900/40 bg-amber-950/10 hover:bg-amber-950/20"
+                              : "border-amber-900/40 bg-amber-950/10"
                           )}
                         >
-                          <p className="text-sm font-medium">{n.title}</p>
-                          <p className="text-xs text-muted mt-1 line-clamp-2">
-                            {n.body}
-                          </p>
-                          <p className="text-[10px] text-muted mt-2">
-                            {new Date(n.createdAt).toLocaleString()}
-                            {!n.read && " · tap to mark read"}
-                          </p>
-                        </button>
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void markRead(n.id)}
+                              className="text-left min-w-0 flex-1"
+                            >
+                              <p className="text-sm font-medium">{n.title}</p>
+                              {n.type && (
+                                <span className="inline-block mt-1 text-[10px] uppercase tracking-wider text-muted border border-border rounded px-1.5 py-0.5">
+                                  {n.type.replace(/_/g, " ")}
+                                </span>
+                              )}
+                              <p className="text-xs text-muted mt-1 line-clamp-2">
+                                {n.body}
+                              </p>
+                              <p className="text-[10px] text-muted mt-2">
+                                {new Date(n.createdAt).toLocaleString()}
+                                {!n.read && " · tap to mark read"}
+                              </p>
+                            </button>
+                            {n.fund?.slug && (
+                              <Link
+                                href={`/dashboard/${n.fund.slug}`}
+                                className="text-[10px] text-muted hover:text-foreground shrink-0"
+                              >
+                                Fund →
+                              </Link>
+                            )}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
+              </DashboardPanel>
+
+              <DashboardPanel title="Wallet watchlists">
+                <WalletWatchPanel />
               </DashboardPanel>
 
               <DashboardPanel

@@ -50,8 +50,11 @@ Manual API checks:
 2. **Settings** — show SoSo module health (9 modules), SoDEX testnet ready, kill switch off.
 3. **Create** — connect wallet, use preset prompt, show live module fetch + signal map.
 4. **Approve** — sign disclosure + execution approval; confirm SoDEX order refs (not `mock-*`).
-5. **Dashboard** — pending approve panel, execution orders, intelligence refresh, rebalance.
-6. **Marketplace** — public fund with live data badge and SoSo module tags.
+5. **Dashboard** — pending approve → **Live SoDEX order tape** (SSE + reconcile), intelligence refresh, rebalance.
+   Optional: **Wallet watchlists** on Dashboard/Settings (track addresses; unlock advanced intel for more slots).
+6. **Marketplace** — open a public fund → **Open paper mirror** → land on
+   `/dashboard/following/[slug]` with paper NAV, allocations, vs-leader PnL, and
+   mirror timeline. Optionally trigger a leader rebalance and refresh the paper book.
 7. **Docs** — `/docs#buildathon-demo` and API reference.
 
 ## APIs integrated
@@ -60,6 +63,13 @@ Manual API checks:
 |----------|-------------------|
 | SoSoValue | Currency, ETF, Macro, Crypto Stocks, Feeds, SSI Indexes, Fundraising, BTC Treasuries, Analysis Charts |
 | SoDEX | Account state, API key list, balances, signed spot `newOrder`, order reconcile |
+
+## Autonomous ops (mention for judges)
+
+- Hourly cron `/api/cron/tick` refreshes SoSo intel, delivers deduped alerts, NAV snapshots, order reconcile
+- Daily jobs generate weekly research memos and propose cadence-based rebalances
+- Dashboard **SoSo alerts** + fund **Weekly AI research desk** (archive + copy/share)
+- Landing **Market Pulse** streams via SSE (`/api/stream?channel=market-pulse`)
 
 ## Safety controls to mention
 

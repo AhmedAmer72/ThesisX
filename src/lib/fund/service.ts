@@ -20,7 +20,7 @@ import { slugify } from "@/lib/utils";
 
 import { isLiveIntelligenceRequired } from "@/lib/soso/fetch";
 
-import { fanoutToFollowers } from "@/lib/copy-trading";
+import { fanoutToFollowers, listPaperPortfolios } from "@/lib/copy-trading";
 import { priceMapFromIntel } from "@/lib/portfolio/mark-to-market";
 import { getExecutionMode, isBuildathonMode } from "@/lib/buildathon";
 import { isProductionMode } from "@/lib/production";
@@ -31,6 +31,7 @@ import {
   type ApprovalAction,
 } from "@/lib/auth/approval";
 import { enqueueJob } from "@/lib/infra/queue";
+import { publishEvent } from "@/lib/realtime/event-bus";
 
 import { generateSosoAlerts } from "@/lib/alerts/service";
 import { FundSetupError } from "@/lib/fund/errors";
@@ -591,6 +592,12 @@ export async function approveAndExecuteFund(
     });
   }
 
+  await publishEvent(`fund:${fundId}`, "orders_submitted", {
+    count: execution.orders.length,
+    mode: execution.mode,
+    message: execution.message,
+  });
+
   const now = new Date();
 
   await prisma.tradeIntent.update({
@@ -665,21 +672,14 @@ export async function approveAndExecuteFund(
   }).catch(() => undefined);
 
   if (snapshot) {
-
     await fanoutToFollowers(
-
       fundId,
-
-      allocations,
-
-      snapshot.nav,
-
+      sanitizedAllocations,
+      reconciliation.nav ?? snapshot.nav,
       "execution",
-
-      snapshot.id
-
+      snapshot.id,
+      intelForReconcile
     );
-
   }
 
 
@@ -1098,6 +1098,12 @@ export async function approveRebalance(
     });
   }
 
+  await publishEvent(`fund:${fundId}`, "orders_submitted", {
+    count: execution.orders.length,
+    mode: execution.mode,
+    kind: "rebalance",
+  });
+
   const now = new Date();
 
   await prisma.rebalanceRun.update({
@@ -1181,10 +1187,11 @@ export async function approveRebalance(
   if (latestSnapshot) {
     await fanoutToFollowers(
       fundId,
-      allocations,
+      sanitizedAllocations,
       reconciliation.nav ?? latestSnapshot.nav,
       "rebalance",
-      latestSnapshot.id
+      latestSnapshot.id,
+      rebalanceIntel
     );
   }
 
@@ -1357,119 +1364,72 @@ export async function runScheduledRebalances() {
 
 
 export async function getUserDashboard(userId: string) {
-
-  const [createdFunds, follows, pendingRebalances, notifications] =
-
+  const [createdFunds, paperPortfolios, pendingRebalances, notifications] =
     await Promise.all([
-
       prisma.fund.findMany({
-
         where: { userId },
-
         orderBy: { updatedAt: "desc" },
-
         include: {
-
           portfolioSnapshots: { orderBy: { createdAt: "desc" }, take: 1 },
-
           performancePoints: { orderBy: { createdAt: "desc" }, take: 1 },
-
           tradeIntents: {
-
             where: { status: { in: ["pending_review", "pending_approval"] } },
-
             take: 1,
-
           },
-
           rebalanceRuns: {
-
             where: { status: "pending_review" },
-
             take: 1,
-
           },
-
         },
-
       }),
-
-      prisma.fundFollow.findMany({
-
-        where: { userId, status: "active" },
-
-        include: {
-
-          fund: {
-
-            include: {
-
-              performancePoints: { orderBy: { createdAt: "desc" }, take: 1 },
-
-            },
-
-          },
-
-        },
-
-      }),
-
+      listPaperPortfolios(userId),
       prisma.rebalanceRun.findMany({
-
         where: {
-
           status: "pending_review",
-
           fund: { userId },
-
         },
-
         include: { fund: true },
-
         orderBy: { createdAt: "desc" },
-
       }),
-
       prisma.notification.findMany({
-
         where: { userId },
-
         orderBy: { createdAt: "desc" },
-
-        take: 20,
-
+        take: 30,
+        include: {
+          fund: { select: { slug: true, name: true } },
+        },
       }),
-
     ]);
 
-
-
   const recentActions = await prisma.reasoningLog.findMany({
-
     where: { fund: { userId } },
-
     orderBy: { createdAt: "desc" },
-
     take: 10,
-
   });
 
-
+  // Backward-compatible shape for older UI + rich paper portfolios
+  const follows = paperPortfolios.map((p) => ({
+    fund: {
+      slug: p.fundSlug,
+      name: p.fundName,
+      status: p.fundStatus,
+    },
+    allocationPct: p.allocationPct,
+    paperNav: p.paperNav,
+    pnlPct: p.pnlPct,
+    vsLeaderPct: p.vsLeaderPct,
+    lastSyncedAt: p.lastSyncedAt,
+    lastTriggeredBy: p.lastTriggeredBy,
+  }));
 
   return {
-
     createdFunds,
-
     follows,
-
+    paperPortfolios,
     pendingRebalances,
-
     notifications,
-
     recentActions,
-
   };
-
 }
 
 

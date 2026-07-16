@@ -28,6 +28,10 @@ export default async function PublicFundPage({
   });
   if (!fund) notFound();
 
+  const activeFollowers = await prisma.fundFollow.count({
+    where: { fundId: fund.id, status: "active" },
+  });
+
   const allocations = fund.portfolioSnapshots[0]
     ? (JSON.parse(fund.portfolioSnapshots[0].allocationsJson) as {
         symbol: string;
@@ -107,7 +111,15 @@ export default async function PublicFundPage({
           )}
           <AllocationChart allocations={allocations} />
           <ResearchContext intel={intelSnapshot} />
-          <FollowFundButton fundId={fund.id} />
+          <div className="rounded-xl border border-border bg-elevated/40 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Paper strategy mirror</p>
+              <span className="text-xs text-muted">
+                {activeFollowers} follower{activeFollowers === 1 ? "" : "s"}
+              </span>
+            </div>
+            <FollowFundButton fundId={fund.id} fundSlug={fund.slug} />
+          </div>
         </div>
         <div className="space-y-10">
           <AgentVotePanel votes={fund.agentVotes} />

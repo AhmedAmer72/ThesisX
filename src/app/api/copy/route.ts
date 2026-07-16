@@ -72,7 +72,13 @@ export async function POST(req: NextRequest) {
   const allocationPct =
     typeof body.allocationPct === "number" ? body.allocationPct : 100;
   const result = await followFund(fundId, auth.user.id, allocationPct);
-  return NextResponse.json({ ...result, requestId: reqId });
+  return NextResponse.json({
+    ...result,
+    portfolioPath: result.fundSlug
+      ? `/dashboard/following/${result.fundSlug}`
+      : null,
+    requestId: reqId,
+  });
 }
 
 export async function DELETE(req: NextRequest) {
