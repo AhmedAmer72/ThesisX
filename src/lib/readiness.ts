@@ -7,6 +7,7 @@ import {
 import { prisma } from "@/lib/db";
 import { isGlobalKillSwitchActive } from "@/lib/settings";
 import { getSodexReadiness } from "@/lib/sodex/readiness";
+import { isAiRequired } from "@/lib/production";
 
 export type ReadinessState = {
   buildathonMode: boolean;
@@ -45,6 +46,9 @@ export async function getReadinessState(): Promise<ReadinessState> {
   const blockers: string[] = [];
   if (!database) blockers.push("Database unavailable");
   if (!sosoLive) blockers.push("SoSoValue API key missing");
+  if (isAiRequired() && !openai) {
+    blockers.push("OpenAI API key missing (OPENAI_API_KEY)");
+  }
   if (isBuildathonMode() && !sodex.ready) {
     blockers.push(...sodex.blockers);
   }
