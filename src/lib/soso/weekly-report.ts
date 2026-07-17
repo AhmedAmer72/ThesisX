@@ -77,9 +77,14 @@ export async function buildWeeklyReport(input: {
       (m) => `${m.symbol} ${m.change24h >= 0 ? "+" : ""}${m.change24h.toFixed(1)}%`
     ) ?? [];
 
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
+  const period = `week-${weekStart.toISOString().slice(0, 10)}`;
+
   return {
     fundName: input.fundName,
-    period: "weekly",
+    period,
     marketOutlook:
       intel && !intel.demoMode
         ? (input.thesisOutlook ??

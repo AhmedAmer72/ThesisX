@@ -64,7 +64,10 @@ npx prisma db push
 
 - Open `/settings` and confirm readiness checklist
 - Run `npm run verify:soso` locally with the same API keys
-- Add Vercel Cron (optional) for `/api/rebalance/run` with header `Authorization: Bearer <CRON_SECRET>`
+- Set `CRON_SECRET` — `vercel.json` already schedules:
+  - `GET /api/cron/tick` hourly (intel, alerts, weekly memos, reconcile, committee)
+  - `GET /api/rebalance/run` every 6 hours (cadence rebalance sweep)
+- Manual tick: `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR_APP/api/cron/tick`
 
 ## WalletConnect
 

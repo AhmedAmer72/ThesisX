@@ -11,6 +11,8 @@ export type AlertInput = {
   metadata?: Record<string, unknown>;
 };
 
+const DEDUPE_WINDOW_MS = 6 * 60 * 60 * 1000;
+
 export async function createNotification(input: AlertInput) {
   return prisma.notification.create({
     data: {
@@ -24,6 +26,33 @@ export async function createNotification(input: AlertInput) {
   });
 }
 
+/** Skip if same type+fund (or user) alert was created recently. */
+async function recentlyNotified(
+  type: string,
+  fundId?: string,
+  userId?: string
+): Promise<boolean> {
+  const since = new Date(Date.now() - DEDUPE_WINDOW_MS);
+  const existing = await prisma.notification.findFirst({
+    where: {
+      type,
+      createdAt: { gte: since },
+      ...(fundId ? { fundId } : {}),
+      ...(userId ? { userId } : {}),
+    },
+    select: { id: true },
+  });
+  return Boolean(existing);
+}
+
+async function maybeNotify(input: AlertInput): Promise<string | null> {
+  if (await recentlyNotified(input.type, input.fundId, input.userId)) {
+    return null;
+  }
+  const n = await createNotification(input);
+  return n.id;
+}
+
 export async function generateSosoAlerts(
   intel: MarketIntelligencePacket,
   fundId?: string,
@@ -32,12 +61,14 @@ export async function generateSosoAlerts(
   const reqId = logRequest("generateSosoAlerts", { fundId });
   const created: string[] = [];
 
+  if (intel.demoMode) return created;
+
   const etfOutflows = intel.etf.filter((e) => {
     const flow = (e.flow ?? "").replace(/[^0-9.-]/g, "");
     return flow.startsWith("-") || (flow && Number(flow) < 0);
   });
   if (etfOutflows.length >= 2) {
-    const n = await createNotification({
+    const id = await maybeNotify({
       userId,
       fundId,
       type: "etf_outflow",
@@ -45,7 +76,7 @@ export async function generateSosoAlerts(
       body: `${etfOutflows.length} ETFs showing net outflows: ${etfOutflows.map((e) => e.name).join(", ")}`,
       metadata: { requestId: reqId, count: etfOutflows.length },
     });
-    created.push(n.id);
+    if (id) created.push(id);
   }
 
   const highImpactMacro = intel.macro.filter(
@@ -55,20 +86,20 @@ export async function generateSosoAlerts(
       m.event.toLowerCase().includes("fomc")
   );
   for (const ev of highImpactMacro.slice(0, 2)) {
-    const n = await createNotification({
+    const id = await maybeNotify({
       userId,
       fundId,
       type: "macro_event",
       title: "Macro watch",
       body: `${ev.event}${ev.date ? ` (${ev.date})` : ""} — ${ev.impact ?? "monitor"}`,
-      metadata: { requestId: reqId },
+      metadata: { requestId: reqId, event: ev.event },
     });
-    created.push(n.id);
+    if (id) created.push(id);
   }
 
   const drawdownIndexes = intel.indexes.filter((i) => (i.changePct ?? 0) < -3);
   if (drawdownIndexes.length > 0) {
-    const n = await createNotification({
+    const id = await maybeNotify({
       userId,
       fundId,
       type: "index_drawdown",
@@ -76,24 +107,29 @@ export async function generateSosoAlerts(
       body: `${drawdownIndexes.map((i) => `${i.name} ${i.changePct?.toFixed(1)}%`).join("; ")}`,
       metadata: { requestId: reqId },
     });
-    created.push(n.id);
+    if (id) created.push(id);
   }
 
-  const btcSpikes = intel.btcTreasuries.filter((b) => (b.btcHoldings ?? 0) > 10000);
+  const btcSpikes = intel.btcTreasuries.filter(
+    (b) => (b.btcHoldings ?? 0) > 10000
+  );
   if (btcSpikes.length > 0) {
-    const n = await createNotification({
+    const id = await maybeNotify({
       userId,
       fundId,
       type: "btc_treasury",
       title: "BTC treasury activity",
-      body: `Large holders: ${btcSpikes.slice(0, 3).map((b) => b.company).join(", ")}`,
+      body: `Large holders: ${btcSpikes
+        .slice(0, 3)
+        .map((b) => b.company)
+        .join(", ")}`,
       metadata: { requestId: reqId },
     });
-    created.push(n.id);
+    if (id) created.push(id);
   }
 
   if (intel.fundraising.length >= 5) {
-    const n = await createNotification({
+    const id = await maybeNotify({
       userId,
       fundId,
       type: "fundraising_surge",
@@ -101,7 +137,30 @@ export async function generateSosoAlerts(
       body: `${intel.fundraising.length} active fundraising projects tracked`,
       metadata: { requestId: reqId },
     });
-    created.push(n.id);
+    if (id) created.push(id);
+  }
+
+  const riskOn = intel.marketPulse?.riskOnScore ?? 50;
+  if (riskOn >= 75) {
+    const id = await maybeNotify({
+      userId,
+      fundId,
+      type: "risk_on_surge",
+      title: "Risk-on surge",
+      body: `SoSo risk-on score hit ${riskOn}/100 — consider reviewing allocations before the next rebalance.`,
+      metadata: { requestId: reqId, riskOnScore: riskOn },
+    });
+    if (id) created.push(id);
+  } else if (riskOn <= 30) {
+    const id = await maybeNotify({
+      userId,
+      fundId,
+      type: "risk_off",
+      title: "Risk-off signal",
+      body: `SoSo risk-on score at ${riskOn}/100 — defensive posture may be warranted.`,
+      metadata: { requestId: reqId, riskOnScore: riskOn },
+    });
+    if (id) created.push(id);
   }
 
   return created;
