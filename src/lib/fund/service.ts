@@ -79,23 +79,12 @@ export async function createFundFromPrompt(
 
 
 
-  const { result, riskChecks, approved } = await runInvestmentCommittee(
-
-    prompt,
-
-    intel,
-
-    {
-
+  const { result, riskChecks, approved, meta: committeeMeta } =
+    await runInvestmentCommittee(prompt, intel, {
       riskLevel,
-
       excludedAssets: excluded,
-
       maxDrawdownPct: options.maxDrawdownPct,
-
-    }
-
-  );
+    });
 
 
 
@@ -327,21 +316,14 @@ export async function createFundFromPrompt(
 
 
   return {
-
     fund,
-
     intel,
-
     committee: result,
-
+    committeeMeta,
     riskChecks,
-
     approved,
-
     tradeIntentId: intent.id,
-
     execution: null,
-
   };
 
 }

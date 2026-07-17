@@ -14,6 +14,7 @@ import {
   RISK_PRESETS,
   runRiskChecks,
   allChecksPassed,
+  type RiskLimits,
 } from "@/lib/risk/engine";
 
 const PRIORITY_SYMBOLS = [
@@ -36,6 +37,11 @@ const AGENTS = [
   "Risk Agent",
   "Allocation Agent",
 ] as const;
+
+export type CommitteeRunMeta = {
+  mode: "openai" | "deterministic";
+  fallbackReason?: string;
+};
 
 function sectorFromFundraising(intel: MarketIntelligencePacket): string | null {
   const top = intel.fundraising[0]?.sector;
@@ -233,6 +239,86 @@ function filterExcluded(
   return filtered.map((a) => ({ ...a, weight: a.weight / total }));
 }
 
+function classifyAiFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  if (message.includes("429") || lower.includes("quota")) return "quota_exceeded";
+  if (message.includes("401") || lower.includes("invalid api key")) {
+    return "auth_failed";
+  }
+  if (lower.includes("rate limit")) return "rate_limited";
+  return "openai_error";
+}
+
+async function recordCommitteeAiRun(params: {
+  status: string;
+  model: string;
+  prompt: string;
+  riskLevel: RiskLevel;
+  output: CommitteeResult;
+  intel: MarketIntelligencePacket;
+  fallbackReason?: string;
+}) {
+  await prisma.aiRun.create({
+    data: {
+      agentName: "Committee",
+      promptVersion: PROMPT_VERSION,
+      model: params.model,
+      inputJson: JSON.stringify({
+        prompt: params.prompt,
+        riskLevel: params.riskLevel,
+        fallbackReason: params.fallbackReason,
+      }),
+      outputJson: JSON.stringify(params.output),
+      citationsJson: JSON.stringify(params.intel.sources.map((s) => s.label)),
+      confidence: params.output.confidence,
+      status: params.status,
+    },
+  });
+}
+
+async function runDeterministicCommittee(
+  prompt: string,
+  intel: MarketIntelligencePacket,
+  riskLevel: RiskLevel,
+  limits: RiskLimits,
+  excluded: string[],
+  fallbackReason?: string
+): Promise<{
+  result: CommitteeResult;
+  riskChecks: ReturnType<typeof runRiskChecks>;
+  approved: boolean;
+  meta: CommitteeRunMeta;
+}> {
+  const result = buildDeterministicCommittee(prompt, intel, riskLevel);
+  result.thesis.summary = `[SoSo deterministic committee · ${PROMPT_VERSION}] ${result.thesis.summary}`;
+  result.allocations = filterExcluded(
+    normalizeAllocations(result.allocations, limits),
+    excluded
+  );
+  const riskChecks = runRiskChecks(result.allocations, limits, excluded);
+
+  await recordCommitteeAiRun({
+    status: fallbackReason ?? "deterministic",
+    model: "soso-deterministic",
+    prompt,
+    riskLevel,
+    output: result,
+    intel,
+    fallbackReason,
+  });
+
+  return {
+    result,
+    riskChecks,
+    approved: allChecksPassed(riskChecks),
+    meta: {
+      mode: "deterministic",
+      fallbackReason,
+    },
+  };
+}
+
 export async function runInvestmentCommittee(
   prompt: string,
   intel: MarketIntelligencePacket,
@@ -241,6 +327,7 @@ export async function runInvestmentCommittee(
   result: CommitteeResult;
   riskChecks: ReturnType<typeof runRiskChecks>;
   approved: boolean;
+  meta: CommitteeRunMeta;
 }> {
   const riskLevel = options.riskLevel ?? inferRiskLevel(prompt);
   const limits = {
@@ -278,17 +365,13 @@ export async function runInvestmentCommittee(
           excluded
         );
         const riskChecks = runRiskChecks(parsed.allocations, limits, excluded);
-        await prisma.aiRun.create({
-          data: {
-            agentName: "Allocation",
-            promptVersion: PROMPT_VERSION,
-            model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-            inputJson: JSON.stringify({ prompt, riskLevel }),
-            outputJson: JSON.stringify(parsed),
-            citationsJson: JSON.stringify(intel.sources.map((s) => s.label)),
-            confidence: parsed.confidence,
-            status: "completed",
-          },
+        await recordCommitteeAiRun({
+          status: "completed",
+          model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+          prompt,
+          riskLevel,
+          output: parsed,
+          intel,
         });
         return {
           result: parsed,
@@ -296,6 +379,7 @@ export async function runInvestmentCommittee(
           approved:
             allChecksPassed(riskChecks) &&
             parsed.executionRecommendation === "execute",
+          meta: { mode: "openai" },
         };
       }
     } catch (e) {
@@ -304,25 +388,41 @@ export async function runInvestmentCommittee(
           e instanceof Error ? e.message : "OpenAI committee failed in production"
         );
       }
+      const fallbackReason = classifyAiFailure(e);
+      return runDeterministicCommittee(
+        prompt,
+        intel,
+        riskLevel,
+        limits,
+        excluded,
+        fallbackReason
+      );
+    }
+
+    if (!isAiRequired()) {
+      return runDeterministicCommittee(
+        prompt,
+        intel,
+        riskLevel,
+        limits,
+        excluded,
+        "empty_openai_response"
+      );
     }
   }
 
   if (isAiRequired()) {
     throw new Error(
-      "OpenAI committee required but unavailable. Add OPENAI_API_KEY to your Vercel environment variables."
+      "OpenAI committee required but unavailable. Set OPENAI_API_KEY and OPENAI_REQUIRED=true."
     );
   }
 
-  const result = buildDeterministicCommittee(prompt, intel, riskLevel);
-  result.thesis.summary = `[Deterministic committee · ${PROMPT_VERSION}] ${result.thesis.summary}`;
-  result.allocations = filterExcluded(
-    normalizeAllocations(result.allocations, limits),
-    excluded
+  return runDeterministicCommittee(
+    prompt,
+    intel,
+    riskLevel,
+    limits,
+    excluded,
+    process.env.OPENAI_API_KEY ? undefined : "openai_key_missing"
   );
-  const riskChecks = runRiskChecks(result.allocations, limits, excluded);
-  return {
-    result,
-    riskChecks,
-    approved: allChecksPassed(riskChecks),
-  };
 }

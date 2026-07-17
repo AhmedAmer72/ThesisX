@@ -19,7 +19,9 @@ type Health = {
   sosoConfigured: boolean;
   sodexTestnet?: boolean;
   openaiConfigured: boolean;
+  openaiRequired?: boolean;
   blockers?: string[];
+  warnings?: string[];
 };
 
 type SodexTest = {
@@ -119,11 +121,23 @@ export function SettingsPanel() {
             <li>SoSoValue live: {String(health.sosoConfigured)}</li>
             <li>SoDEX testnet: {String(health.sodexTestnet ?? false)}</li>
             <li>Execution mode: {health.executionMode}</li>
-            <li>OpenAI committee: {String(health.openaiConfigured)}</li>
+            <li>
+              OpenAI enhancement:{" "}
+              {health.openaiConfigured
+                ? "configured"
+                : health.openaiRequired
+                  ? "required but missing"
+                  : "optional (not configured)"}
+            </li>
             <li>Buildathon mode: {String(health.buildathonMode ?? false)}</li>
             {health.blockers?.map((b) => (
               <li key={b} className="text-amber-300">
                 Blocker: {b}
+              </li>
+            ))}
+            {health.warnings?.map((w) => (
+              <li key={w} className="text-muted">
+                Note: {w}
               </li>
             ))}
           </ul>
