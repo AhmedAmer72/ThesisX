@@ -3,6 +3,7 @@ import type { MarketIntelligencePacket } from "@/lib/types";
 import { getCachedModule, setCachedModule } from "@/lib/soso/cache";
 
 import { sosoGet, sosoPost } from "@/lib/soso/fetch";
+import { attachMarketPricesToCoinList } from "@/lib/soso/currency-prices";
 
 import {
   SOSO_ENDPOINTS,
@@ -184,7 +185,143 @@ export function getModuleDef(id: SosoModuleId): ModuleDef | undefined {
 
   }
 
+  if (id === "currency") {
+
+    return {
+
+      module: "currency",
+
+      path: SOSO_ENDPOINTS.currency.path,
+
+      label: SOSO_ENDPOINTS.currency.label,
+
+      cacheKey: SOSO_ENDPOINTS.currency.cacheKey,
+
+      method: "POST",
+
+      body: {},
+
+      apply: applyCurrency,
+
+    };
+
+  }
+
   return MODULE_DEFS.find((m) => m.module === id);
+
+}
+
+
+
+async function fetchCurrencyModule(
+
+  useCache: boolean
+
+): Promise<{ ok: boolean; meta: ModuleFetchMeta; raw?: unknown }> {
+
+  const moduleId = "currency" as const;
+
+  const cacheKey = SOSO_ENDPOINTS.currency.cacheKey;
+
+  const endpoint = SOSO_ENDPOINTS.currency.path;
+
+
+
+  if (useCache) {
+
+    const cached = await getCachedModule<unknown>(moduleId, cacheKey);
+
+    if (cached) {
+
+      return {
+
+        ok: true,
+
+        raw: cached.data,
+
+        meta: {
+
+          module: moduleId,
+
+          endpoint,
+
+          label: SOSO_ENDPOINTS.currency.label,
+
+          status: "cached",
+
+          fetchedAt: cached.fetchedAt,
+
+          cacheHit: true,
+
+        },
+
+      };
+
+    }
+
+  }
+
+
+
+  const listResult = await sosoPost(endpoint, {});
+
+  if (!listResult.ok) {
+
+    return {
+
+      ok: false,
+
+      meta: {
+
+        module: moduleId,
+
+        endpoint,
+
+        label: SOSO_ENDPOINTS.currency.label,
+
+        status: "error",
+
+        error: listResult.error,
+
+        fetchedAt: new Date().toISOString(),
+
+        cacheHit: false,
+
+      },
+
+    };
+
+  }
+
+
+
+  const priced = await attachMarketPricesToCoinList(listResult.data);
+
+  const fetchedAt = await setCachedModule(moduleId, cacheKey, priced);
+
+  return {
+
+    ok: true,
+
+    raw: priced,
+
+    meta: {
+
+      module: moduleId,
+
+      endpoint,
+
+      label: SOSO_ENDPOINTS.currency.label,
+
+      status: "ok",
+
+      fetchedAt,
+
+      cacheHit: false,
+
+    },
+
+  };
 
 }
 
@@ -355,6 +492,14 @@ export async function fetchModule(
   useCache: boolean
 
 ): Promise<{ ok: boolean; meta: ModuleFetchMeta; raw?: unknown }> {
+
+  if (def.module === "currency") {
+
+    return fetchCurrencyModule(useCache);
+
+  }
+
+
 
   if (useCache) {
 

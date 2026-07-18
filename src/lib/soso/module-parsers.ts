@@ -90,7 +90,12 @@ export function applyCurrency(packet: MarketIntelligencePacket, data: unknown) {
         symbol,
         name: str(row.fullName ?? row.name, symbol),
         price: num(row.price ?? row.lastPrice ?? row.currentPrice),
-        change24h: num(row.change24h ?? row.changePercent ?? row.percentChange),
+        change24h: num(
+          row.change24h ??
+            row.change_pct_24h ??
+            row.changePercent ??
+            row.percentChange
+        ),
       };
     })
     .filter((c) => isValidSymbolFormat(c.symbol))

@@ -20,7 +20,8 @@ export const SOSO_ENDPOINTS: Record<
       "/openapi/v1/data/default/coin/list",
     method: "POST",
     label: "Listed Currencies",
-    cacheKey: "coin-list",
+    // Includes market-snapshot prices attached after coin/list.
+    cacheKey: "coin-list-priced",
   },
   etf: {
     path:

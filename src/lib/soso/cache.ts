@@ -46,19 +46,23 @@ export async function setCachedModule(
   data: unknown
 ): Promise<string> {
   const fetchedAt = new Date();
-  await prisma.intelligenceCache.upsert({
-    where: { module_key: { module, key } },
-    create: {
-      module,
-      key,
-      payload: JSON.stringify(data),
-      fetchedAt,
-    },
-    update: {
-      payload: JSON.stringify(data),
-      fetchedAt,
-    },
-  });
+  try {
+    await prisma.intelligenceCache.upsert({
+      where: { module_key: { module, key } },
+      create: {
+        module,
+        key,
+        payload: JSON.stringify(data),
+        fetchedAt,
+      },
+      update: {
+        payload: JSON.stringify(data),
+        fetchedAt,
+      },
+    });
+  } catch {
+    /* DB optional for hot path — Redis / memory still usable */
+  }
   try {
     const redis = getRedis();
     await redis.set(

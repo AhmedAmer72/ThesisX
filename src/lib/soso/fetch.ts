@@ -24,6 +24,15 @@ function parseApiPayload(raw: unknown): FetchResult<unknown> {
   return { ok: true, data: raw };
 }
 
+/** Keep snowflake currency IDs exact — JSON.parse would round them as numbers. */
+function parseJsonPreservingIds(text: string): unknown {
+  const safe = text.replace(
+    /"(currencyId|currency_id)"\s*:\s*(\d{15,})/g,
+    '"$1":"$2"'
+  );
+  return JSON.parse(safe);
+}
+
 async function request(
   method: "GET" | "POST",
   path: string,
@@ -57,7 +66,8 @@ async function request(
         return { ok: false, error: `http_${res.status}` };
       }
 
-      const json = await res.json();
+      const text = await res.text();
+      const json = parseJsonPreservingIds(text);
       return parseApiPayload(json);
     } catch (e) {
       attempt++;

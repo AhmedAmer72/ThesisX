@@ -14,7 +14,7 @@ Validated against official docs (Phase 0). Use `.env` for keys.
 
 | Module | Path (live) | Method | Purpose |
 |--------|-------------|--------|---------|
-| Currency | `/openapi/v1/data/default/coin/list` | POST | Asset universe |
+| Currency | `/openapi/v1/data/default/coin/list` + `/openapi/v1/currencies/{id}/market-snapshot` | POST + GET | Asset universe + live USD prices |
 | ETF | `/openapi/v2/etf/currentEtfDataMetrics` | POST | ETF flows (us-btc-spot, us-eth-spot, us-sol-spot) |
 | Macro | `/openapi/v1/macro/events` | GET | Macro calendar |
 | Crypto Stocks | `/openapi/v1/crypto-stocks/sectors` | GET | Sector performance |
