@@ -22,8 +22,14 @@ import { isLiveIntelligenceRequired } from "@/lib/soso/fetch";
 
 import { fanoutToFollowers } from "@/lib/copy-trading";
 import { priceMapFromIntel } from "@/lib/portfolio/mark-to-market";
-import { isBuildathonMode } from "@/lib/buildathon";
+import { getExecutionMode, isBuildathonMode } from "@/lib/buildathon";
 import { isProductionMode } from "@/lib/production";
+import { getSodexReadiness } from "@/lib/sodex/readiness";
+import {
+  isApprovalSignatureRequired,
+  verifyApprovalSignature,
+  type ApprovalAction,
+} from "@/lib/auth/approval";
 import { enqueueJob } from "@/lib/infra/queue";
 
 import { generateSosoAlerts } from "@/lib/alerts/service";
@@ -49,6 +55,70 @@ const CADENCE_MS: Record<string, number> = {
   weekly: 7 * 24 * 60 * 60 * 1000,
 
 };
+
+function isSuccessfulOrderStatus(status: string): boolean {
+  return ["submitted", "filled", "filled_simulated", "reconciled"].includes(
+    status
+  );
+}
+
+async function assertWalletApproval(
+  slug: string,
+  walletAddress: string,
+  options: ApproveFundOptions,
+  action: ApprovalAction,
+  intentId: string
+) {
+  if (!isApprovalSignatureRequired()) return;
+  if (
+    !options.approvalSignature ||
+    !options.approvalTimestamp ||
+    !options.intentId
+  ) {
+    throw new Error(
+      "Wallet approval signature required. Confirm in your wallet to proceed."
+    );
+  }
+  if (options.intentId !== intentId) {
+    throw new Error("Approval intent mismatch");
+  }
+  const verified = await verifyApprovalSignature({
+    address: walletAddress,
+    action,
+    slug,
+    intentId: options.intentId,
+    timestamp: options.approvalTimestamp,
+    signature: options.approvalSignature,
+  });
+  if (!verified.ok) throw new Error(verified.error);
+}
+
+function assertSodexReadyForExecution(): void {
+  const mode = getExecutionMode();
+  if (mode !== "testnet" && mode !== "mainnet") return;
+  const sodex = getSodexReadiness();
+  if (!sodex.ready) {
+    throw new Error(
+      `SoDEX testnet not configured: ${[...sodex.blockers, ...sodex.warnings].join("; ")}`
+    );
+  }
+}
+
+function assertExecutionProducedOrders(
+  execution: Awaited<ReturnType<typeof executeTradePlan>>
+): void {
+  const mode = getExecutionMode();
+  if (mode === "mock") return;
+  const successful = execution.orders.filter((o) =>
+    isSuccessfulOrderStatus(o.status)
+  );
+  if (successful.length === 0) {
+    throw new Error(
+      execution.message ||
+        "Execution produced no orders. Configure SoDEX credentials in Settings."
+    );
+  }
+}
 
 
 
@@ -400,7 +470,24 @@ export async function approveAndExecuteFund(
 
   }
 
+  if (!pendingIntent) {
+    throw new Error("No pending trade intent to approve.");
+  }
 
+  const walletAddress = options.walletAddress?.toLowerCase();
+  if (!walletAddress) {
+    throw new Error("Wallet address required for approval.");
+  }
+
+  await assertWalletApproval(
+    fund.slug,
+    walletAddress,
+    options,
+    "fund_execute",
+    pendingIntent.id
+  );
+
+  assertSodexReadyForExecution();
 
   const snapshot = fund.portfolioSnapshots[0];
 
@@ -430,6 +517,8 @@ export async function approveAndExecuteFund(
 
   const execution = await executeTradePlan(fundId, tradePlan);
 
+  assertExecutionProducedOrders(execution);
+
   for (const o of execution.orders) {
     await prisma.executionOrder.create({
       data: {
@@ -447,17 +536,13 @@ export async function approveAndExecuteFund(
 
   const now = new Date();
 
-  if (pendingIntent) {
+  await prisma.tradeIntent.update({
 
-    await prisma.tradeIntent.update({
+    where: { id: pendingIntent.id },
 
-      where: { id: pendingIntent.id },
+    data: { status: "executed", approvedAt: now, executedAt: now },
 
-      data: { status: "executed", approvedAt: now, executedAt: now },
-
-    });
-
-  }
+  });
 
 
 
@@ -893,7 +978,23 @@ export async function approveRebalance(
 
   }
 
+  const walletAddress = options.walletAddress?.toLowerCase();
+  if (!walletAddress) {
+    throw new Error("Wallet address required for rebalance approval.");
+  }
 
+  const fundRecord = await prisma.fund.findUnique({ where: { id: fundId } });
+  if (!fundRecord) throw new Error("Fund not found");
+
+  await assertWalletApproval(
+    fundRecord.slug,
+    walletAddress,
+    options,
+    "rebalance_execute",
+    run.id
+  );
+
+  assertSodexReadyForExecution();
 
   const allocations = JSON.parse(
 
@@ -919,6 +1020,8 @@ export async function approveRebalance(
   });
 
   const execution = await executeTradePlan(fundId, tradePlan);
+
+  assertExecutionProducedOrders(execution);
 
   for (const o of execution.orders) {
     await prisma.executionOrder.create({

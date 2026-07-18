@@ -18,7 +18,7 @@ export function CapabilitiesStrip() {
     <section className="border-b border-border bg-elevated py-16 md:py-20">
       <div className="slash-container">
         <h2 className="font-display text-2xl font-normal tracking-tight md:text-3xl">
-          Amplified with modern capabilities
+          What 9 SoSo modules unlock
         </h2>
         <ul className="mt-10 grid md:grid-cols-3 gap-8 md:gap-12">
           {capabilities.map((c) => (

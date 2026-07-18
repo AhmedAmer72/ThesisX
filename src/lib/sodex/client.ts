@@ -117,14 +117,35 @@ export async function executeTradePlan(
   const privateKey = process.env.SODEX_API_PRIVATE_KEY as
     | `0x${string}`
     | undefined;
-  const accountId = process.env.SODEX_ACCOUNT_ID;
+  let accountId = process.env.SODEX_ACCOUNT_ID;
+  const userAddress = process.env.SODEX_USER_ADDRESS?.trim();
 
-  if (!keyName || !privateKey || !accountId) {
+  if (!keyName || !privateKey) {
     return {
       mode,
       orders: [],
       message:
-        "SoDEX credentials missing - falling back would be unsafe. Use mock mode.",
+        "SoDEX API credentials missing. Generate and register an API key in Settings.",
+    };
+  }
+
+  const spotBaseEarly =
+    mode === "testnet"
+      ? (process.env.SODEX_SPOT_BASE ??
+        "https://testnet-gw.sodex.dev/api/v1/spot")
+      : "https://mainnet-gw.sodex.dev/api/v1/spot";
+
+  if (!accountId && userAddress) {
+    const resolved = await getAccountId(userAddress, spotBaseEarly);
+    if (resolved != null) accountId = String(resolved);
+  }
+
+  if (!accountId) {
+    return {
+      mode,
+      orders: [],
+      message:
+        "SoDEX account ID missing. Set SODEX_ACCOUNT_ID or SODEX_USER_ADDRESS.",
     };
   }
 

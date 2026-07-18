@@ -11,30 +11,35 @@ export function CtaSection() {
     <section className="border-t border-border bg-page-background py-20 md:py-28">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
         <h2 className="font-display text-3xl font-normal tracking-tight md:text-4xl">
-          Apply in less than 10 minutes today
+          Launch from live SoSo signals
         </h2>
         <p className="text-muted mt-4 text-[15px]">
-          Join builders already launching AI-managed funds on ThesisX.
+          Connect wallet, describe your thesis, review committee output, and
+          approve execution on SoDEX testnet.
         </p>
         <form
-          className="mt-8 flex flex-col sm:flex-row gap-2 p-1.5 rounded-full bg-surface border border-border-strong max-w-md mx-auto"
+          className="mt-8 flex flex-col sm:flex-row gap-2 p-1.5 rounded-2xl bg-surface border border-border-strong max-w-xl mx-auto"
           onSubmit={(e) => {
             e.preventDefault();
-            router.push("/create");
+            if (email.trim().length < 10) {
+              router.push("/create");
+              return;
+            }
+            router.push(`/create?prompt=${encodeURIComponent(email.trim())}`);
           }}
         >
           <input
-            type="email"
+            type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="flex-1 px-5 py-3.5 bg-transparent outline-none text-sm rounded-full min-w-0"
+            placeholder="Describe your AI fund thesis..."
+            className="flex-1 px-5 py-3.5 bg-transparent outline-none text-sm rounded-xl min-w-0"
           />
           <button
             type="submit"
-            className="whitespace-nowrap rounded-full bg-primary px-6 py-3.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="whitespace-nowrap rounded-xl bg-primary px-6 py-3.5 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Start for Free
+            Create Fund
           </button>
         </form>
       </div>

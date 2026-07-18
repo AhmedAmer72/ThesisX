@@ -6,6 +6,7 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { TrustBanner } from "@/components/layout/trust-banner";
+import { WalletSessionBanner } from "@/components/layout/wallet-session-banner";
 import { HashScroll } from "@/components/layout/hash-scroll";
 
 const inter = Inter({
@@ -23,9 +24,9 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "ThesisX - Launch Your AI Hedge Fund",
+  title: "ThesisX — SoSo Intelligence to AI Hedge Funds",
   description:
-    "AI-native autonomous on-chain fund operating system powered by SoSoValue intelligence and SoDEX execution.",
+    "Turn live SoSoValue market intelligence into AI-managed funds with wallet-signed approval and SoDEX testnet execution.",
   icons: {
     icon: [{ url: THESISX_LOGO_SRC, type: "image/svg+xml" }],
     apple: [{ url: THESISX_LOGO_SRC, type: "image/svg+xml" }],
@@ -41,6 +42,7 @@ export default function RootLayout({
         <AppProviders>
           <SiteHeader />
           <TrustBanner />
+          <WalletSessionBanner />
           <HashScroll />
           <main className="grow flex-1">{children}</main>
           <SiteFooter />

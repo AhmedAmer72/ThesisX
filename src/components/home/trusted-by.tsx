@@ -32,7 +32,7 @@ export function TrustedBy() {
     <section id="company" className="scroll-mt-28 py-20 md:py-28 border-y border-border bg-elevated">
       <div className="slash-container">
         <h2 className="font-display text-2xl font-normal tracking-tight text-center md:text-3xl">
-          Built on live data infrastructure
+          Built on SoSoValue live intelligence
         </h2>
         <p className="text-muted text-center mt-3 text-sm max-w-lg mx-auto">
           ThesisX connects directly to SoSoValue intelligence and SoDEX execution —

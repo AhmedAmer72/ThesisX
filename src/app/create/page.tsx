@@ -10,8 +10,10 @@ import { RiskBadge } from "@/components/fund/risk-badge";
 import { ExecutionStepper } from "@/components/fund/execution-stepper";
 import { IntelSourcesPanel } from "@/components/soso/intel-sources-panel";
 import { WhyPortfolioPanel } from "@/components/fund/why-portfolio-panel";
+import { useSignMessage } from "wagmi";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { fetchWithWallet } from "@/lib/wallet/api";
+import { signExecutionApproval } from "@/lib/wallet/approval-client";
 import { CREATE_PRESETS } from "@/lib/create/presets";
 import { CreateStepper } from "@/components/create/create-stepper";
 import type {
@@ -45,12 +47,14 @@ type FundDetail = {
     rationale: string;
   }[];
   portfolioSnapshots: { allocationsJson: string }[];
+  tradeIntents?: { id: string; status: string }[];
 };
 
 const RISK_OPTIONS = ["low", "medium", "high", "aggressive"] as const;
 
 function CreateFundContent() {
-  const { address } = useWallet();
+  const { address, isBackendLinked, sessionStatus, sessionError } = useWallet();
+  const { signMessageAsync } = useSignMessage();
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialPrompt = searchParams.get("prompt") ?? "";
@@ -112,8 +116,16 @@ function CreateFundContent() {
   }
 
   async function generate(p: string) {
-    if (buildathonMode && !address) {
+    if (!address) {
       setError("Connect your wallet before generating a fund.");
+      setPhase("error");
+      return;
+    }
+    if (!isBackendLinked && sessionStatus !== "linking") {
+      setError(
+        sessionError ??
+          "Wallet session not linked. Confirm the sign-in message in your wallet."
+      );
       setPhase("error");
       return;
     }
@@ -528,9 +540,23 @@ function CreateFundContent() {
             </div>
           )}
 
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/10 px-4 py-3 text-sm text-emerald-100">
+            Your fund is public and should appear in the{" "}
+            <Link href="/marketplace" className="underline font-medium">
+              Marketplace
+            </Link>{" "}
+            immediately after creation.
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <Button onClick={() => router.push(`/funds/${fund.slug}`)}>
               View Public Fund Page
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => router.push("/marketplace")}
+            >
+              Open Marketplace
             </Button>
             <Button
               variant="secondary"
@@ -540,17 +566,37 @@ function CreateFundContent() {
             </Button>
             {fund.status === "pending_review" && (
               <Button
-                disabled={!disclosureAccepted || approving}
+                disabled={!disclosureAccepted || approving || !address}
                 onClick={async () => {
                   setApproving(true);
                   setError(null);
                   try {
+                    const pendingIntent = fund.tradeIntents?.find((t) =>
+                      ["pending_review", "pending_approval"].includes(t.status)
+                    );
+                    if (!pendingIntent) {
+                      throw new Error("No pending trade intent found.");
+                    }
+                    const approval = await signExecutionApproval(
+                      address!,
+                      signMessageAsync,
+                      {
+                        action: "fund_execute",
+                        slug: fund.slug,
+                        intentId: pendingIntent.id,
+                      }
+                    );
                     const res = await fetchWithWallet(
                       `/api/funds/${fund.slug}/approve`,
                       address,
                       {
                         method: "POST",
-                        body: JSON.stringify({ disclosureAccepted: true }),
+                        body: JSON.stringify({
+                          disclosureAccepted: true,
+                          intentId: pendingIntent.id,
+                          approvalSignature: approval.approvalSignature,
+                          approvalTimestamp: approval.approvalTimestamp,
+                        }),
                       }
                     );
                     const data = await res.json();
@@ -566,7 +612,7 @@ function CreateFundContent() {
                   }
                 }}
               >
-                {approving ? "Executing..." : "Approve & Execute"}
+                {approving ? "Sign & Execute..." : "Sign & Approve Execution"}
               </Button>
             )}
           </div>

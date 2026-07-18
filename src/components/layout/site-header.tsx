@@ -51,7 +51,7 @@ export function SiteHeader() {
   const centerLinks = inApp ? appNavLinks : marketingNavLinks;
   const mobileLinks = inApp
     ? appNavLinks
-    : [...marketingNavLinks, { label: "Get Started", href: "/create" }];
+    : [...marketingNavLinks, { label: "Launch Fund", href: "/create" }];
 
   return (
     <>
@@ -102,7 +102,7 @@ export function SiteHeader() {
                 href="/create"
                 className="rounded-full border border-white/80 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10 sm:px-5 sm:py-2.5"
               >
-                Get Started
+                Launch Fund
               </Link>
             )}
             <WalletConnectButton variant="header" />

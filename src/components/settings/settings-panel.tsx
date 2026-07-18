@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SosoHealthPanel } from "@/components/soso/soso-health-panel";
+import { SodexSetupWizard } from "@/components/settings/sodex-setup-wizard";
 import { WalletConnectButton } from "@/components/wallet/wallet-connect-button";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { shortenAddress } from "@/lib/wallet/utils";
@@ -196,6 +197,8 @@ export function SettingsPanel() {
       </section>
 
       <SosoHealthPanel />
+
+      <SodexSetupWizard />
 
       <section className="bg-surface rounded-2xl border border-border p-6">
         <h2 className="font-semibold">SoDEX testnet</h2>

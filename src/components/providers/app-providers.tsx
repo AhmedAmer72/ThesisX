@@ -12,7 +12,10 @@ import {
   WALLET_DISCONNECT_KEY,
   WALLET_PREFERENCE_EVENT,
 } from "@/lib/wallet/constants";
-import { WalletPersistence } from "@/components/providers/wallet-provider";
+import {
+  WalletPersistence,
+  WalletProvider,
+} from "@/components/providers/wallet-provider";
 
 const queryClient = new QueryClient();
 
@@ -50,8 +53,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             borderRadius: "large",
           })}
         >
-          <WalletPersistence />
-          {children}
+          <WalletProvider>
+            <WalletPersistence />
+            {children}
+          </WalletProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
