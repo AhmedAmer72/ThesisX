@@ -14,7 +14,7 @@ import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { NavChart } from "@/components/dashboard/nav-chart";
 import { AiCopilotPanel } from "@/components/copilot/ai-copilot-panel";
 import { FundExecutionApprovePanel } from "@/components/fund/fund-execution-approve-panel";
-import { ExecutionOrdersPanel } from "@/components/fund/execution-orders-panel";
+import { LiveOrderTape } from "@/components/fund/live-order-tape";
 import { IntelSourcesPanel } from "@/components/soso/intel-sources-panel";
 import type { MarketIntelligencePacket } from "@/lib/types";
 
@@ -32,7 +32,7 @@ export default async function DashboardPage({
       portfolioSnapshots: { orderBy: { createdAt: "desc" }, take: 1 },
       performancePoints: { orderBy: { createdAt: "desc" }, take: 10 },
       reasoningLogs: { orderBy: { createdAt: "desc" }, take: 8 },
-      executionOrders: { orderBy: { createdAt: "desc" }, take: 5 },
+      executionOrders: { orderBy: { createdAt: "desc" }, take: 40 },
       agentVotes: { orderBy: { createdAt: "desc" }, take: 8 },
       rebalanceRuns: {
         where: { status: "pending_review" },
@@ -168,9 +168,12 @@ export default async function DashboardPage({
         </div>
 
         <div className="mt-6">
-          <DashboardPanel title="SoDEX execution orders">
-            <ExecutionOrdersPanel
-              orders={fund.executionOrders.map((o) => ({
+          <DashboardPanel title="Live SoDEX order tape">
+            <LiveOrderTape
+              slug={fund.slug}
+              fundId={fund.id}
+              initialOrders={fund.executionOrders.map((o) => ({
+                id: o.id,
                 symbol: o.symbol,
                 side: o.side,
                 quantity: o.quantity,
@@ -179,6 +182,7 @@ export default async function DashboardPage({
                 externalRef: o.externalRef,
                 nonce: o.nonce,
                 createdAt: o.createdAt.toISOString(),
+                updatedAt: o.updatedAt.toISOString(),
               }))}
             />
           </DashboardPanel>

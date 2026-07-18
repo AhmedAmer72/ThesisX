@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SosoHealthPanel } from "@/components/soso/soso-health-panel";
 import { SodexSetupWizard } from "@/components/settings/sodex-setup-wizard";
+import { WalletWatchPanel } from "@/components/settings/wallet-watch-panel";
 import { WalletConnectButton } from "@/components/wallet/wallet-connect-button";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { shortenAddress } from "@/lib/wallet/utils";
@@ -108,6 +109,21 @@ export function SettingsPanel() {
       </section>
 
       <section className="bg-surface rounded-2xl border border-border p-6">
+        <h2 className="font-semibold">Autonomous ops</h2>
+        <p className="text-sm text-muted mt-2 leading-relaxed">
+          Vercel Cron hits <code className="text-xs bg-elevated px-1 rounded">/api/cron/tick</code> hourly
+          to refresh SoSo intel, deliver alerts (6h dedupe), snapshot NAV, generate weekly memos,
+          reconcile orders, and propose cadence-based rebalances. Set{" "}
+          <code className="text-xs bg-elevated px-1 rounded">CRON_SECRET</code> on Vercel.
+        </p>
+        <ul className="mt-3 text-xs text-muted space-y-1 list-disc pl-4">
+          <li>Hourly: intel · alerts · NAV · reconcile</li>
+          <li>Daily: weekly research memo · committee rebalance check</li>
+          <li>Every 6h: legacy <code>/api/rebalance/run</code> cadence sweep</li>
+        </ul>
+      </section>
+
+      <section className="bg-surface rounded-2xl border border-border p-6">
         <h2 className="font-semibold">Buildathon readiness</h2>
         {health ? (
           <ul className="mt-4 text-sm space-y-2 text-muted">
@@ -196,6 +212,13 @@ export function SettingsPanel() {
       </section>
 
       <SosoHealthPanel />
+
+      <section className="bg-surface rounded-2xl border border-border p-6">
+        <h2 className="font-semibold">Wallet watchlists</h2>
+        <div className="mt-4">
+          <WalletWatchPanel />
+        </div>
+      </section>
 
       <SodexSetupWizard />
 
