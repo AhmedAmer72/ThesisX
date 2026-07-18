@@ -20,3 +20,12 @@ export class SosoLiveRequiredError extends Error {
 export function isSosoSetupError(e: unknown): e is SosoSetupError {
   return e instanceof SosoSetupError;
 }
+
+export function isSosoLiveRequiredError(
+  e: unknown
+): e is SosoLiveRequiredError {
+  return (
+    e instanceof SosoLiveRequiredError ||
+    (e instanceof Error && e.name === "SosoLiveRequiredError")
+  );
+}

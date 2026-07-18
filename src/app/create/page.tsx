@@ -74,6 +74,10 @@ function CreateFundContent() {
   >(initialPrompt && !slugParam ? "generating" : slugParam ? "review" : "form");
   const [fund, setFund] = useState<FundDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<Record<string, unknown> | null>(
+    null
+  );
   const [steps, setSteps] = useState<string[]>([]);
   const [approving, setApproving] = useState(false);
   const [executionMode, setExecutionMode] = useState("mock");
@@ -115,20 +119,35 @@ function CreateFundContent() {
     }
   }
 
+  function setStructuredError(
+    message: string,
+    code?: string | null,
+    details?: Record<string, unknown> | null
+  ) {
+    setError(message);
+    setErrorCode(code ?? null);
+    setErrorDetails(details ?? null);
+    setPhase("error");
+  }
+
   async function generate(p: string) {
     if (!address) {
-      setError("Connect your wallet before generating a fund.");
-      setPhase("error");
+      setStructuredError(
+        "Connect your wallet before generating a fund.",
+        "wallet_required"
+      );
       return;
     }
     if (!isBackendLinked && sessionStatus !== "linking") {
-      setError(
+      setStructuredError(
         sessionError ??
-          "Wallet session not linked. Confirm the sign-in message in your wallet."
+          "Wallet session not linked. Confirm the sign-in message in your wallet.",
+        "wallet_session"
       );
-      setPhase("error");
       return;
     }
+    setErrorCode(null);
+    setErrorDetails(null);
     setPhase("generating");
     setSteps([
       "Fetching live SoSoValue intelligence...",
@@ -166,14 +185,23 @@ function CreateFundContent() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
+      if (!res.ok) {
+        setStructuredError(
+          data.error ?? "Failed to create fund",
+          data.code ?? null,
+          data.details ?? data.moduleErrors ?? null
+        );
+        return;
+      }
       setCommitteeMode(data.committeeMode ?? null);
       setCommitteeFallbackReason(data.committeeFallbackReason ?? null);
       await loadFund(data.slug);
       router.replace(`/create?slug=${data.slug}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
-      setPhase("error");
+      setStructuredError(
+        e instanceof Error ? e.message : "Unknown error",
+        "network_error"
+      );
     }
   }
 
@@ -355,11 +383,65 @@ function CreateFundContent() {
 
       {phase === "error" && (
         <div className="mt-8 rounded-xl border border-red-900/50 bg-red-950/40 p-4 text-sm text-red-300">
-          {error}
+          <p>{error}</p>
+          {errorCode && (
+            <p className="mt-2 text-xs uppercase tracking-wide text-red-400/80">
+              Code: {errorCode}
+            </p>
+          )}
+          {errorCode === "live_fetch_failed" &&
+            errorDetails &&
+            typeof errorDetails === "object" && (
+              <ul className="mt-2 list-disc pl-5 text-xs text-red-300/90">
+                {Object.entries(errorDetails as Record<string, string>).map(
+                  ([mod, msg]) => (
+                    <li key={mod}>
+                      {mod}: {msg}
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
+          {errorCode === "no_tradable_assets" && errorDetails && (
+            <div className="mt-2 text-xs text-red-300/90 space-y-1">
+              {Array.isArray(errorDetails.unmapped) &&
+                (errorDetails.unmapped as string[]).length > 0 && (
+                  <p>
+                    Unmapped on SoDEX:{" "}
+                    {(errorDetails.unmapped as string[]).join(", ")}
+                  </p>
+                )}
+              {Array.isArray(errorDetails.unpriced) &&
+                (errorDetails.unpriced as string[]).length > 0 && (
+                  <p>
+                    Missing SoSo prices:{" "}
+                    {(errorDetails.unpriced as string[]).join(", ")}
+                  </p>
+                )}
+              <p>
+                Check Settings → SoDEX setup and ensure SoSoValue currency data
+                includes live prices.
+              </p>
+            </div>
+          )}
+          {errorCode === "missing_api_key" && (
+            <p className="mt-2 text-xs text-red-300/90">
+              Add SOSOVALUE_API_KEY in Settings or Vercel env vars.
+            </p>
+          )}
+          {errorCode === "wallet_required" && (
+            <p className="mt-2 text-xs text-red-300/90">
+              Connect the same wallet used for SoDEX testnet trading.
+            </p>
+          )}
           <Button
             className="mt-4"
             variant="secondary"
-            onClick={() => setPhase("form")}
+            onClick={() => {
+              setErrorCode(null);
+              setErrorDetails(null);
+              setPhase("form");
+            }}
           >
             Try again
           </Button>

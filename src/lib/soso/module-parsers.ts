@@ -1,5 +1,6 @@
 import type { MarketIntelligencePacket } from "@/lib/types";
 import { extractList, num, str } from "@/lib/soso/parsers";
+import { isValidSymbolFormat } from "@/lib/sodex/tradable";
 
 const PRIORITY_SYMBOLS = [
   "BTC",
@@ -79,18 +80,21 @@ export function applyCurrency(packet: MarketIntelligencePacket, data: unknown) {
     if (ib >= 0) return 1;
     return sa.localeCompare(sb);
   });
-  packet.currencies = sorted.slice(0, 30).map((row) => {
-    const symbol = str(
-      row.currencyName ?? row.symbol ?? row.ticker,
-      "???"
-    ).toUpperCase();
-    return {
-      symbol,
-      name: str(row.fullName ?? row.name, symbol),
-      price: num(row.price ?? row.lastPrice),
-      change24h: num(row.change24h ?? row.changePercent ?? row.percentChange),
-    };
-  });
+  packet.currencies = sorted
+    .map((row) => {
+      const symbol = str(
+        row.currencyName ?? row.symbol ?? row.ticker,
+        "???"
+      ).toUpperCase();
+      return {
+        symbol,
+        name: str(row.fullName ?? row.name, symbol),
+        price: num(row.price ?? row.lastPrice ?? row.currentPrice),
+        change24h: num(row.change24h ?? row.changePercent ?? row.percentChange),
+      };
+    })
+    .filter((c) => isValidSymbolFormat(c.symbol))
+    .slice(0, 30);
 }
 
 export function applyEtfMetrics(packet: MarketIntelligencePacket, data: unknown) {

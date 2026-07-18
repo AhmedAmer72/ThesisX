@@ -12,6 +12,11 @@ import {
   resolveUserFromWallet,
 } from "@/lib/auth/wallet";
 import { isBuildathonMode } from "@/lib/buildathon";
+import { isFundSetupError } from "@/lib/fund/errors";
+import {
+  isSosoLiveRequiredError,
+  isSosoSetupError,
+} from "@/lib/soso/errors";
 
 
 
@@ -131,21 +136,66 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e) {
+    if (isSosoSetupError(e)) {
+      return NextResponse.json(
+        { error: e.message, code: e.code, requestId: reqId },
+        { status: 503 }
+      );
+    }
+    if (isSosoLiveRequiredError(e)) {
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: e.code,
+          moduleErrors: e.moduleErrors,
+          requestId: reqId,
+        },
+        { status: 502 }
+      );
+    }
+    if (isFundSetupError(e)) {
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: e.code,
+          details: e.details,
+          requestId: reqId,
+        },
+        { status: 422 }
+      );
+    }
+    if (
+      e instanceof Error &&
+      e.message.includes("Connect wallet before creating a fund")
+    ) {
+      return NextResponse.json(
+        { error: e.message, code: "wallet_required", requestId: reqId },
+        { status: 401 }
+      );
+    }
+    if (
+      e instanceof Error &&
+      e.message.startsWith("Missing live price for")
+    ) {
+      const symbol = e.message.replace("Missing live price for ", "").trim();
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: "missing_live_price",
+          symbol,
+          requestId: reqId,
+        },
+        { status: 422 }
+      );
+    }
 
     return NextResponse.json(
-
       {
-
         error: e instanceof Error ? e.message : "Failed to create fund",
-
         requestId: reqId,
-
       },
-
       { status: 500 }
-
     );
-
   }
 
 }
