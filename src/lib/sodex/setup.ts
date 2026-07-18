@@ -6,8 +6,9 @@ export type GeneratedApiKey = {
   privateKey: `0x${string}`;
   publicAddress: `0x${string}`;
   addApiKeyPayload: {
+    accountID: number;
     name: string;
-    type: "EVM";
+    type: 1;
     publicKey: string;
     expiresAt: number;
   };
@@ -24,8 +25,9 @@ export function generateSodexApiKey(keyName = "thesisx-api-01"): GeneratedApiKey
     privateKey,
     publicAddress: account.address,
     addApiKeyPayload: {
+      accountID: 0,
       name: keyName,
-      type: "EVM",
+      type: 1,
       publicKey: account.address,
       expiresAt,
     },

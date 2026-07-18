@@ -3,6 +3,7 @@ import type {
   MarketIntelligencePacket,
   MarketPulseSummary,
 } from "@/lib/types";
+import { SOSO_ENDPOINTS } from "@/lib/soso/endpoints";
 
 export type SignalKind =
   | "market_regime"
@@ -33,18 +34,6 @@ export type AllocationSignalLink = {
   explanation: string;
 };
 
-function kindFromModule(module: string): SignalKind {
-  if (module === "macro") return "market_regime";
-  if (module === "etf") return "liquidity";
-  if (module === "feeds") return "catalyst";
-  if (module === "index") return "trend";
-  if (module === "currency") return "opportunity";
-  if (module === "fundraising") return "opportunity";
-  if (module === "btc-treasuries") return "trend";
-  if (module === "crypto-stocks") return "risk";
-  return "neutral" as SignalKind;
-}
-
 export function extractSignalsFromPacket(
   packet: MarketIntelligencePacket
 ): SosoSignal[] {
@@ -56,7 +45,7 @@ export function extractSignalsFromPacket(
       id: `feeds-${feed.title.slice(0, 24)}`,
       kind: "catalyst",
       module: "feeds",
-      endpoint: "/openapi/v2/feeds",
+      endpoint: SOSO_ENDPOINTS.feeds.path,
       label: "News Feed",
       summary: feed.title,
       confidence: feed.sentiment === "bullish" ? 72 : feed.sentiment === "bearish" ? 68 : 55,
@@ -78,7 +67,7 @@ export function extractSignalsFromPacket(
       id: `etf-${etf.name}`,
       kind: "liquidity",
       module: "etf",
-      endpoint: "/openapi/v2/etf/currentEtfDataMetrics",
+      endpoint: SOSO_ENDPOINTS.etf.path,
       label: "ETF Flow",
       summary: `${etf.name}: ${etf.flow ?? "flow data"}`,
       confidence: 75,
@@ -101,7 +90,7 @@ export function extractSignalsFromPacket(
       id: `index-${idx.name}`,
       kind: "trend",
       module: "index",
-      endpoint: "/openapi/v2/index",
+      endpoint: SOSO_ENDPOINTS.index.path,
       label: "SSI Index",
       summary: `${idx.name} ${idx.changePct ?? 0}%`,
       confidence: 70,
@@ -117,7 +106,7 @@ export function extractSignalsFromPacket(
       id: `macro-${macro.event}`,
       kind: "market_regime",
       module: "macro",
-      endpoint: "/openapi/v2/macro",
+      endpoint: SOSO_ENDPOINTS.macro.path,
       label: "Macro Event",
       summary: macro.event,
       confidence: 65,
@@ -137,7 +126,7 @@ export function extractSignalsFromPacket(
       id: `currency-${c.symbol}`,
       kind: "opportunity",
       module: "currency",
-      endpoint: "/openapi/v2/currency",
+      endpoint: SOSO_ENDPOINTS.currency.path,
       label: "Spot Mover",
       summary: `${c.symbol} ${ch >= 0 ? "+" : ""}${ch.toFixed(2)}% 24h`,
       confidence: Math.min(90, 50 + Math.abs(ch) * 4),

@@ -32,6 +32,8 @@ Base host: `https://openapi.sosovalue.com`. Override paths via `SOSO_*_PATH` env
 - Cache: Redis optional; MVP uses in-memory TTL (5 min default)
 - Fallback: demo packet only when `DEMO_MODE=true` or `NODE_ENV=test`; with `DEMO_MODE=false` and a valid key, live data is required
 - Verify: `npm run verify:soso`
+- Buildathon: require ≥6 successful modules (override via `SOSO_MIN_MODULES_OK`)
+- Fund create fetches all 9 core modules including Analysis Charts
 - Rate limits: per GitBook — treat as soft limit; log `X-RateLimit-*` if present
 
 ## SoDEX
@@ -53,7 +55,9 @@ Base host: `https://openapi.sosovalue.com`. Override paths via `SOSO_*_PATH` env
 ### MVP execution mode
 
 - `EXECUTION_MODE=mock` — simulates fills (default for demo)
-- `EXECUTION_MODE=testnet` — requires `SODEX_API_KEY_NAME`, `SODEX_API_PRIVATE_KEY`, `SODEX_ACCOUNT_ID`
+- `EXECUTION_MODE=testnet` — requires `SODEX_API_KEY_NAME`, `SODEX_API_PRIVATE_KEY`, `SODEX_ACCOUNT_ID` (primary account often `0`)
+- Verify: `npm run verify:sodex`
+- `POST /api/sodex/setup` key generation requires signed wallet session
 - `EXECUTION_MODE=mainnet` — disabled unless `ALLOW_MAINNET=true`
 
 ## Environment checklist

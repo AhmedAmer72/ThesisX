@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -13,6 +14,7 @@ import {
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { WALLET_DISCONNECT_KEY } from "@/lib/wallet/constants";
 import { persistWalletConnection } from "@/lib/wallet/utils";
+import { setStoredSession } from "@/lib/wallet/session";
 
 export type WalletSessionStatus = "idle" | "linking" | "linked" | "error";
 
@@ -29,6 +31,8 @@ type WalletContextValue = {
 type WalletSessionBridge = {
   setSessionStatus: Dispatch<SetStateAction<WalletSessionStatus>>;
   setSessionError: Dispatch<SetStateAction<string | null>>;
+  /** Incremented by retryLink; WalletPersistence uses it as an effect trigger. */
+  retryCount: number;
 };
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -41,7 +45,9 @@ export function WalletPersistence() {
   const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const bridge = useContext(WalletSessionBridgeContext);
+  const wasConnectedRef = useRef(false);
 
+  // On mount: honour explicit disconnect preference
   useEffect(() => {
     if (
       typeof window !== "undefined" &&
@@ -51,6 +57,18 @@ export function WalletPersistence() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Track user-initiated disconnects so reconnectOnMount flag stays correct
+  useEffect(() => {
+    if (wasConnectedRef.current && !isConnected) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(WALLET_DISCONNECT_KEY, "1");
+      }
+      // Clear stale session immediately
+      setStoredSession(null);
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected]);
 
   const linkWallet = useCallback(async () => {
     if (!address || !bridge) return;
@@ -63,7 +81,13 @@ export function WalletPersistence() {
     bridge.setSessionStatus("linking");
     bridge.setSessionError(null);
     try {
+      // Clear any stale token from a previous wallet before persisting the new one
+      setStoredSession(null);
       await persistWalletConnection(address, signMessageAsync);
+      // Connected intentionally — allow reconnect on next page load
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(WALLET_DISCONNECT_KEY);
+      }
       bridge.setSessionStatus("linked");
       bridge.setSessionError(null);
     } catch (e) {
@@ -76,14 +100,20 @@ export function WalletPersistence() {
     }
   }, [address, bridge, signMessageAsync]);
 
+  const retryCount = bridge?.retryCount ?? 0;
+
   useEffect(() => {
     if (!isConnected || !address) {
+      // Ensure stale session is cleared on disconnect
+      setStoredSession(null);
       bridge?.setSessionStatus("idle");
       bridge?.setSessionError(null);
       return;
     }
     void linkWallet();
-  }, [address, isConnected, linkWallet, bridge]);
+    // retryCount is intentionally included: retryLink increments it to re-trigger signing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected, linkWallet, bridge, retryCount]);
 
   return null;
 }
@@ -93,17 +123,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [sessionStatus, setSessionStatus] =
     useState<WalletSessionStatus>("idle");
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [retryTick, setRetryTick] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   const bridge = useMemo(
-    () => ({ setSessionStatus, setSessionError }),
-    [setSessionStatus, setSessionError]
+    () => ({ setSessionStatus, setSessionError, retryCount }),
+    [setSessionStatus, setSessionError, retryCount]
   );
 
   const retryLink = useCallback(() => {
     setSessionError(null);
     setSessionStatus("idle");
-    setRetryTick((n) => n + 1);
+    setRetryCount((n) => n + 1);
   }, []);
 
   const value = useMemo<WalletContextValue>(
@@ -124,7 +154,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       sessionStatus,
       sessionError,
       retryLink,
-      retryTick,
     ]
   );
 

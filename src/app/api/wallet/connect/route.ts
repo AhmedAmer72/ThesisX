@@ -26,6 +26,17 @@ export async function POST(req: NextRequest) {
     const signature = body.signature as `0x${string}` | undefined;
     const nonce = body.nonce as string | undefined;
 
+    // Reject unsigned requests in strict auth mode BEFORE any DB write
+    if ((!message || !signature) && isStrictWalletAuth()) {
+      return NextResponse.json(
+        {
+          error: "Signed wallet authentication required",
+          requestId: reqId,
+        },
+        { status: 401 }
+      );
+    }
+
     if (message && signature) {
       if (!nonce || !(await consumeNonce(walletAddress, nonce))) {
         return NextResponse.json(
@@ -54,16 +65,6 @@ export async function POST(req: NextRequest) {
       : await prisma.user.create({
           data: { walletAddress },
         });
-
-    if ((!message || !signature) && isStrictWalletAuth()) {
-      return NextResponse.json(
-        {
-          error: "Signed wallet authentication required",
-          requestId: reqId,
-        },
-        { status: 401 }
-      );
-    }
 
     const sessionToken =
       message && signature ? issueSessionToken(walletAddress) : undefined;

@@ -45,3 +45,11 @@ export function isCronSecretRequired(): boolean {
     process.env.NODE_ENV === "production"
   );
 }
+
+/** Minimum successful SoSo modules before fund create in buildathon/live mode. */
+export function getMinSosoModulesRequired(): number {
+  const fromEnv = Number(process.env.SOSO_MIN_MODULES_OK);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  if (isBuildathonMode() || isProductionMode()) return 6;
+  return 1;
+}

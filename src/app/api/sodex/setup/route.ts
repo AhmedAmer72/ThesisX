@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logRequest } from "@/lib/observability";
+import { getWalletFromRequest } from "@/lib/auth/wallet";
 import { getSodexReadiness } from "@/lib/sodex/readiness";
 import {
   fetchAccountState,
@@ -38,12 +39,14 @@ export async function GET(req: NextRequest) {
     apiKeys,
     keyRegistered,
     setupSteps: [
-      "Connect master wallet on ValueChain testnet",
-      "POST /api/sodex/setup with action=generate to create API key pair",
-      "Register public key via SoDEX addAPIKey (master wallet signs)",
+      "Testnet: no API access application required (buildathon rule)",
+      "Generate API key pair in Settings, then Register on testnet (master wallet signs addAPIKey)",
       "Set SODEX_API_KEY_NAME, SODEX_API_PRIVATE_KEY, SODEX_ACCOUNT_ID, SODEX_USER_ADDRESS in Vercel",
+      "Confirm key appears in registered API keys list",
       "Run Test SoDEX connection in Settings",
     ],
+    testnetRegisterEndpoint:
+      "POST https://testnet-gw.sodex.dev/api/v1/spot/accounts/api-keys",
     docsUrl: "https://sodex.com/documentation/api/api",
     requestId: reqId,
   });
@@ -59,6 +62,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "generate") {
+    const wallet = getWalletFromRequest(req);
+    if (!wallet) {
+      return NextResponse.json(
+        {
+          error:
+            "Connect wallet and sign in before generating a SoDEX API key pair.",
+          requestId: reqId,
+        },
+        { status: 401 }
+      );
+    }
     const generated = generateSodexApiKey(body.keyName ?? "thesisx-api-01");
     return NextResponse.json({
       generated: {

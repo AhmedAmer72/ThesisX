@@ -99,4 +99,7 @@ export const CORE_MODULES: SosoModuleId[] = [
   "index",
   "fundraising",
   "btc-treasuries",
+  "charts",
 ];
+
+export const FULL_MODULE_COUNT = CORE_MODULES.length;

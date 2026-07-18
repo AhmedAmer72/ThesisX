@@ -13,6 +13,9 @@ import { FundMetricGrid } from "@/components/dashboard/fund-metric-grid";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { NavChart } from "@/components/dashboard/nav-chart";
 import { AiCopilotPanel } from "@/components/copilot/ai-copilot-panel";
+import { FundExecutionApprovePanel } from "@/components/fund/fund-execution-approve-panel";
+import { ExecutionOrdersPanel } from "@/components/fund/execution-orders-panel";
+import { IntelSourcesPanel } from "@/components/soso/intel-sources-panel";
 import type { MarketIntelligencePacket } from "@/lib/types";
 
 export default async function DashboardPage({
@@ -34,6 +37,11 @@ export default async function DashboardPage({
       rebalanceRuns: {
         where: { status: "pending_review" },
         orderBy: { createdAt: "desc" },
+      },
+      tradeIntents: {
+        where: { status: { in: ["pending_review", "pending_approval"] } },
+        orderBy: { createdAt: "desc" },
+        take: 3,
       },
       fundReports: { orderBy: { generatedAt: "desc" }, take: 5 },
     },
@@ -74,6 +82,18 @@ export default async function DashboardPage({
           confidence={fund.thesis?.confidence ?? 0}
           status={fund.status}
         />
+
+        <div className="mt-8">
+          <FundExecutionApprovePanel
+            slug={fund.slug}
+            fundStatus={fund.status}
+            pendingIntents={fund.tradeIntents.map((t) => ({
+              id: t.id,
+              status: t.status,
+              kind: t.kind,
+            }))}
+          />
+        </div>
 
         <div className="mt-8">
           <FundMetricGrid
@@ -138,8 +158,30 @@ export default async function DashboardPage({
           </DashboardPanel>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-6 grid lg:grid-cols-2 gap-5">
           <IntelligencePanel slug={fund.slug} initialSnapshot={intelSnapshot} />
+          <IntelSourcesPanel
+            intel={intelSnapshot}
+            intelFetchedAt={fund.thesis?.intelFetchedAt?.toISOString()}
+            demoMode={intelSnapshot?.demoMode}
+          />
+        </div>
+
+        <div className="mt-6">
+          <DashboardPanel title="SoDEX execution orders">
+            <ExecutionOrdersPanel
+              orders={fund.executionOrders.map((o) => ({
+                symbol: o.symbol,
+                side: o.side,
+                quantity: o.quantity,
+                status: o.status,
+                mode: o.mode,
+                externalRef: o.externalRef,
+                nonce: o.nonce,
+                createdAt: o.createdAt.toISOString(),
+              }))}
+            />
+          </DashboardPanel>
         </div>
 
         {fund.status === "active" && (

@@ -74,7 +74,7 @@ function actionIcon(type: string) {
 }
 
 export function DashboardIndexView() {
-  const { address, isConnected } = useWallet();
+  const { address, isConnected, isBackendLinked, sessionStatus } = useWallet();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,9 +96,14 @@ export function DashboardIndexView() {
     }
   }, [address]);
 
+  // Wait until the backend session is established before loading protected data.
+  // In dev (sessionStatus stays "idle"), load as soon as address is available.
+  // In strict/buildathon mode, load once isBackendLinked becomes true.
   useEffect(() => {
+    if (!address) return;
+    if (sessionStatus === "linking") return;
     void load();
-  }, [load]);
+  }, [address, isBackendLinked, sessionStatus, load]);
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -207,7 +212,13 @@ export function DashboardIndexView() {
           </div>
         )}
 
-        {isConnected && loading && !data && <DashboardLoading />}
+        {isConnected && sessionStatus === "linking" && (
+          <div className="mt-8 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+            Signing in with your wallet — check your wallet for a sign request…
+          </div>
+        )}
+
+        {isConnected && sessionStatus !== "linking" && loading && !data && <DashboardLoading />}
 
         {isConnected && data && stats && (
           <>

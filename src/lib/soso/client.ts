@@ -13,7 +13,11 @@ import { getDemoIntelligencePacket } from "@/lib/soso/demo-data";
 import { SosoSetupError, SosoLiveRequiredError } from "@/lib/soso/errors";
 
 import { hasSosoApiKey, isLiveIntelligenceRequired } from "@/lib/soso/fetch";
-import { isDemoPacketAllowed } from "@/lib/buildathon";
+import {
+  getMinSosoModulesRequired,
+  isDemoPacketAllowed,
+} from "@/lib/buildathon";
+import { FULL_MODULE_COUNT } from "@/lib/soso/endpoints";
 import { attachSignalsToPacket } from "@/lib/soso/signals";
 
 import { listCacheFreshness } from "@/lib/soso/cache";
@@ -331,6 +335,15 @@ export class SosoClient {
 
 
     const okCount = metas.filter((m) => m.status !== "error").length;
+    const minRequired = getMinSosoModulesRequired();
+    const totalExpected = moduleList?.length ?? FULL_MODULE_COUNT;
+
+    if (okCount < minRequired && (liveOnly || !this.shouldAllowDemo())) {
+      throw new SosoLiveRequiredError(
+        `Only ${okCount}/${totalExpected} SoSo modules succeeded (need ${minRequired}).`,
+        errors
+      );
+    }
 
     if (okCount === 0) {
 

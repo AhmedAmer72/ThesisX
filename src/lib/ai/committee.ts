@@ -16,6 +16,7 @@ import {
   allChecksPassed,
   type RiskLimits,
 } from "@/lib/risk/engine";
+import { extractSignalsFromPacket } from "@/lib/soso/signals";
 
 const PRIORITY_SYMBOLS = [
   "BTC",
@@ -48,6 +49,49 @@ function sectorFromFundraising(intel: MarketIntelligencePacket): string | null {
   return top ?? null;
 }
 
+function scoreSymbolFromSignals(
+  intel: MarketIntelligencePacket,
+  symbol: string
+): number {
+  const signals = extractSignalsFromPacket(intel);
+  let score = 0;
+  const upper = symbol.toUpperCase();
+
+  for (const s of signals) {
+    const impact =
+      s.decisionImpact === "overweight"
+        ? 1
+        : s.decisionImpact === "underweight"
+          ? -0.6
+          : 0.15;
+    if (s.affectedAssets.map((a) => a.toUpperCase()).includes(upper)) {
+      score += (s.confidence / 100) * impact;
+    }
+    if (s.summary.toUpperCase().includes(upper)) {
+      score += (s.confidence / 100) * 0.35;
+    }
+  }
+
+  const currency = intel.currencies.find((c) => c.symbol === upper);
+  if (currency) {
+    score += (currency.change24h ?? 0) / 25;
+    if (intel.topMovers?.some((m) => m.symbol === upper)) score += 0.4;
+  }
+
+  if (intel.indexes.some((i) => (i.changePct ?? 0) > 0 && i.sector)) {
+    score += 0.1;
+  }
+  if (intel.etf.some((e) => (e.changePct ?? 0) > 0)) {
+    if (upper === "BTC" || upper === "ETH" || upper === "SOL") score += 0.25;
+  }
+  if (intel.btcTreasuries.length >= 2 && upper === "BTC") score += 0.3;
+
+  const priorityIdx = PRIORITY_SYMBOLS.indexOf(upper);
+  if (priorityIdx >= 0) score += (PRIORITY_SYMBOLS.length - priorityIdx) * 0.05;
+
+  return score;
+}
+
 function pickAllocationUniverse(
   intel: MarketIntelligencePacket,
   riskLevel: RiskLevel
@@ -55,25 +99,20 @@ function pickAllocationUniverse(
   const infraSymbols = ["RNDR", "TAO", "AKT", "AR", "ETH", "SOL"];
   const hotSector = sectorFromFundraising(intel);
 
-  const byPriority = [...intel.currencies]
+  const byScore = [...intel.currencies]
     .filter((c) => c.symbol && c.symbol !== "???")
-    .sort((a, b) => {
-      const ia = PRIORITY_SYMBOLS.indexOf(a.symbol);
-      const ib = PRIORITY_SYMBOLS.indexOf(b.symbol);
-      if (ia >= 0 && ib >= 0) return ia - ib;
-      if (ia >= 0) return -1;
-      if (ib >= 0) return 1;
-      return (b.change24h ?? 0) - (a.change24h ?? 0);
-    });
+    .map((c) => ({ ...c, signalScore: scoreSymbolFromSignals(intel, c.symbol) }))
+    .sort((a, b) => b.signalScore - a.signalScore);
 
-  const infraPicks = byPriority.filter(
+  const infraPicks = byScore.filter(
     (c) =>
       infraSymbols.includes(c.symbol) ||
       PRIORITY_SYMBOLS.includes(c.symbol) ||
+      c.signalScore > (riskLevel === "aggressive" ? 0.35 : 0.5) ||
       (c.change24h ?? 0) > (riskLevel === "aggressive" ? 0.5 : 1)
   );
 
-  let picks = infraPicks.length >= 3 ? infraPicks : byPriority;
+  let picks = infraPicks.length >= 3 ? infraPicks : byScore;
   picks = picks.slice(0, 5);
 
   const weights =
@@ -93,7 +132,7 @@ function pickAllocationUniverse(
         : c.symbol === "ETH" || c.symbol === "SOL"
           ? "L1"
           : hotSector ?? "Infrastructure",
-    rationale: `SoSoValue currency momentum ${c.change24h ?? 0}%${
+    rationale: `SoSo signal score ${(c as { signalScore?: number }).signalScore?.toFixed(2) ?? "n/a"} · momentum ${c.change24h ?? 0}%${
       intel.topMovers?.some((m) => m.symbol === c.symbol)
         ? " (top mover)"
         : ""

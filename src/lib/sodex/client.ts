@@ -40,8 +40,21 @@ function parseOrderResponse(text: string): string | undefined {
       orderID?: string;
       clOrdID?: string;
       status?: string;
+      code?: number;
+      message?: string;
+      msg?: string;
+      data?: { orderID?: string; clOrdID?: string };
     };
-    return json.orderID ?? json.clOrdID ?? json.status;
+    if (json.code != null && json.code !== 0) {
+      return json.message ?? json.msg ?? `sodex_code_${json.code}`;
+    }
+    return (
+      json.orderID ??
+      json.clOrdID ??
+      json.data?.orderID ??
+      json.data?.clOrdID ??
+      json.status
+    );
   } catch {
     return text.slice(0, 200) || undefined;
   }
@@ -56,8 +69,12 @@ export async function getAccountId(
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { aid?: number };
-    return data.aid ?? null;
+    const data = (await res.json()) as {
+      aid?: number;
+      data?: { aid?: number };
+    };
+    const aid = data.aid ?? data.data?.aid;
+    return aid != null ? aid : null;
   } catch {
     return null;
   }
