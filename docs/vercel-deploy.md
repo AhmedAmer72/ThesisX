@@ -64,8 +64,9 @@ npx prisma db push
 
 - Open `/settings` and confirm readiness checklist
 - Run `npm run verify:soso` locally with the same API keys
-- Set `CRON_SECRET` — `vercel.json` already schedules:
-  - `GET /api/cron/tick` hourly (intel, alerts, weekly memos, reconcile, committee)
+- Set `CRON_SECRET` — `vercel.json` already schedules (Hobby: max once/day):
+  - `GET /api/cron/tick` daily at 00:00 UTC (intel, alerts, weekly memos, reconcile, committee)
+  - `GET /api/rebalance/run` daily at 12:00 UTC
   - `GET /api/rebalance/run` every 6 hours (cadence rebalance sweep)
 - Manual tick: `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR_APP/api/cron/tick`
 

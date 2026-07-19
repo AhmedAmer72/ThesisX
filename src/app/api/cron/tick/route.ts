@@ -10,7 +10,7 @@ import { isCronSecretRequired } from "@/lib/buildathon";
  * 1) enqueue intel / alerts / weekly / committee / reconcile jobs
  * 2) process the pending queue
  *
- * Vercel Cron: GET /api/cron/tick hourly (Authorization: Bearer CRON_SECRET)
+ * Vercel Cron: GET /api/cron/tick daily on Hobby (Authorization: Bearer CRON_SECRET)
  */
 async function handle(req: NextRequest) {
   const reqId = logRequest("CRON /api/cron/tick");

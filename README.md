@@ -12,7 +12,7 @@ Built for the SoSoValue Buildathon (*One-Person Autonomous Financial Businesses*
 - **SoDEX testnet execution** - EIP-712 spot orders, API-key setup/register, readiness checks, order reconcile + live NAV marks
 - **Fund dashboard** - approve pending trades, propose/approve rebalance, refresh intelligence, NAV chart, AI copilot, **live order tape** (SSE)
 - **Marketplace + paper strategy mirrors** - follow public funds to paper NAV, allocations, vs-leader PnL, mirror timeline on `/dashboard/following/[slug]`
-- **Autonomous cron OS** - hourly `/api/cron/tick` (intel, alerts, NAV, weekly memo, committee, reconcile); rebalance runner every 6h
+- **Autonomous cron OS** - daily `/api/cron/tick` (intel, alerts, NAV, weekly memo, committee, reconcile); daily rebalance runner (Hobby Vercel limit; upgrade Pro for hourly)
 - **SoSo alerts + weekly research desk** - deduped alerts; cron-generated weekly memos with archive/copy/share
 - **Market Pulse SSE** - landing streams live/cached SoSo pulse via `/api/stream?channel=market-pulse`
 - **Wallet watchlists** - track addresses from Settings/Dashboard (plan-limited slots)

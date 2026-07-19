@@ -137,7 +137,7 @@ export const docSections: DocSection[] = [
       "Weekly memos: GET /api/reports/weekly?slug=... — persisted as FundReport; archive + copy/share on fund dashboard",
       "Alerts: ETF outflows, macro, index drawdowns, BTC treasury, fundraising, risk-on/off (6h dedupe)",
       "Notifications on /dashboard; PATCH /api/notifications (id or markAllRead)",
-      "Autonomous cron: GET /api/cron/tick (hourly) enqueues intel/alerts/weekly/committee/reconcile jobs",
+      "Autonomous cron: GET /api/cron/tick (daily on Hobby) enqueues intel/alerts/weekly/committee/reconcile jobs",
       "Live desk: GET /api/stream?channel=market-pulse (SSE) powers Market Pulse",
       "Order tape: GET /api/stream?channel=fund:{id} + GET /api/funds/[slug]/orders?refresh=true",
       "Wallet watchlists: GET/POST/DELETE /api/wallets/watch (Settings + Dashboard)",

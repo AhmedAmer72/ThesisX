@@ -66,7 +66,7 @@ Manual API checks:
 
 ## Autonomous ops (mention for judges)
 
-- Hourly cron `/api/cron/tick` refreshes SoSo intel, delivers deduped alerts, NAV snapshots, order reconcile
+- Daily cron `/api/cron/tick` refreshes SoSo intel, delivers deduped alerts, NAV snapshots, order reconcile (Hobby plan limit)
 - Daily jobs generate weekly research memos and propose cadence-based rebalances
 - Dashboard **SoSo alerts** + fund **Weekly AI research desk** (archive + copy/share)
 - Landing **Market Pulse** streams via SSE (`/api/stream?channel=market-pulse`)
